@@ -623,7 +623,7 @@
     <div class="topbar-stats">
       <div class="tstat"><span class="tstat-n" id="stat-total">—</span><span class="tstat-l">Records</span></div>
       <div class="tstat"><span class="tstat-n" id="stat-types">—</span><span class="tstat-l">Types</span></div>
-      <div class="tstat"><span class="tstat-n" id="stat-recent">—</span><span class="tstat-l">Latest year</span></div>
+      <div class="tstat"><span class="tstat-n" id="stat-recent">—</span><span class="tstat-l">Latest updated</span></div>
     </div>
     <div class="topbar-links">
       <a href="https://github.com/Metadata-Game-Changers/recuration-watch/blob/main/README.md" target="_blank">ReadMe ↗</a>
@@ -643,7 +643,7 @@
     <span class="tb-sort-label">Sort</span>
     <div class="sort-group">
       <button class="sort-opt active" id="sort-updated">Updated</button>
-      <button class="sort-opt" id="sort-year">Year</button>
+      <button class="sort-opt" id="sort-year">Published</button>
       <button class="sort-opt" id="sort-title">Title</button>
     </div>
   </div>
@@ -694,7 +694,7 @@ async function fetchActivities(doiId) {
 
 function populateFilters(dois) {
   const types = [...new Set(dois.map(d => d.attributes?.types?.resourceTypeGeneral).filter(Boolean))].sort();
-  const years = [...new Set(dois.map(d => d.attributes?.publicationYear).filter(Boolean))].sort((a,b)=>b-a);
+  const years = [...new Set(dois.map(d => d.attributes?.updated ? new Date(d.attributes.updated).getFullYear() : null).filter(Boolean))].sort((a,b)=>b-a);
   const ts = document.getElementById('type-filter');
   types.forEach(t => { const o=document.createElement('option'); o.value=o.textContent=t; ts.appendChild(o); });
   const ys = document.getElementById('year-filter');
@@ -704,7 +704,7 @@ function populateFilters(dois) {
 function updateStats(dois) {
   document.getElementById('stat-total').textContent = dois.length;
   document.getElementById('stat-types').textContent = new Set(dois.map(d=>d.attributes?.types?.resourceTypeGeneral).filter(Boolean)).size;
-  const years = dois.map(d=>d.attributes?.publicationYear).filter(Boolean);
+  const years = dois.map(d=>d.attributes?.updated ? new Date(d.attributes.updated).getFullYear() : null).filter(Boolean);
   document.getElementById('stat-recent').textContent = years.length ? Math.max(...years) : '—';
 
 }
@@ -742,7 +742,7 @@ function applyFiltersAndRender() {
     const doi = d.id ?? '';
     return (!q||[title,creators,doi].join(' ').toLowerCase().includes(q))
         && (!type||a.types?.resourceTypeGeneral===type)
-        && (!year||String(a.publicationYear)===year);
+        && (!year||(a.updated ? String(new Date(a.updated).getFullYear())===year : false));
   });
   filtered.sort((a,b)=>{
     if (sortKey==='updated') return new Date(b.attributes?.updated??0)-new Date(a.attributes?.updated??0);
@@ -780,6 +780,7 @@ function renderRow(d) {
   const typeS  = a.types?.resourceType ?? '';
   const schema = (a.schemaVersion??'').replace('http://datacite.org/schema/kernel-','v');
   const updated = a.updated ? fmtDate(a.updated) : '';
+  const pubYear  = a.publicationYear ?? '';
   const views = a.viewCount??0, cites = a.citationCount??0, dl = a.downloadCount??0;
   return `
   <div class="doi-row" id="card-${sanitizeId(doi)}">
@@ -795,6 +796,7 @@ function renderRow(d) {
         </div>
         <div class="doi-identifier">
           <a href="https://doi.org/${doi}" target="_blank">${escHtml(doi)}</a>
+          ${pubYear?`<span style="margin-left:.8rem">published ${pubYear}</span>`:''}
           ${updated?`<span style="margin-left:.8rem">updated ${updated}</span>`:''}
         </div>
         <div class="doi-counts">

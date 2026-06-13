@@ -456,6 +456,7 @@
     .page-btn.active { background: var(--ink); color: var(--white); border-color: var(--ink); z-index: 1; }
     .page-btn:hover:not(.active):not(:disabled) { background: var(--off); }
     .page-btn:disabled { opacity: 0.35; cursor: default; }
+    .page-ellipsis { border-color: transparent; background: none; opacity: 0.5; padding: 0.4rem 0.4rem; }
 
     .loading-state, .error-state, .empty-state {
       padding: 2.5rem 0;
@@ -658,7 +659,7 @@
 
 <script>
 const API_BASE  = 'https://api.datacite.org';
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 const DEFAULT_CLIENT = 'sjyq.oozvia';
 
 let CLIENT_ID   = DEFAULT_CLIENT;
@@ -667,6 +668,7 @@ let filtered    = [];
 let currentPage = 1;
 let sortKey     = 'updated';
 let expandedDOI = null;
+let loading     = false;
 
 async function fetchAllDOIs() {
   let results = [], cursor = 1, total = null;
@@ -717,6 +719,7 @@ function syncFiltersToURL() {
   if (q)    url.searchParams.set('q', q);    else url.searchParams.delete('q');
   if (type) url.searchParams.set('type', type); else url.searchParams.delete('type');
   if (year) url.searchParams.set('year', year); else url.searchParams.delete('year');
+  if (currentPage > 1) url.searchParams.set('page', currentPage); else url.searchParams.delete('page');
   window.history.replaceState({}, '', url);
 }
 
@@ -725,16 +728,17 @@ function applyFiltersFromURL() {
   const q    = params.get('q') || '';
   const type = params.get('type') || '';
   const year = params.get('year') || '';
+  const page = parseInt(params.get('page') || '1', 10);
   if (q)    document.getElementById('search-input').value = q;
   if (type) document.getElementById('type-filter').value  = type;
   if (year) document.getElementById('year-filter').value  = year;
+  if (page > 1) currentPage = page;
 }
 
 function applyFiltersAndRender() {
   const q    = document.getElementById('search-input').value.toLowerCase();
   const type = document.getElementById('type-filter').value;
   const year = document.getElementById('year-filter').value;
-  syncFiltersToURL();
   filtered = allDOIs.filter(d => {
     const a = d.attributes ?? {};
     const title = a.titles?.[0]?.title ?? '';
@@ -750,13 +754,15 @@ function applyFiltersAndRender() {
     if (sortKey==='title')   return (a.attributes?.titles?.[0]?.title??'').localeCompare(b.attributes?.titles?.[0]?.title??'');
     return 0;
   });
-  currentPage = 1;
   renderPage();
 }
 
 function renderPage() {
   const total = filtered.length;
-  const pages = Math.ceil(total/PAGE_SIZE);
+  const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if (currentPage < 1) currentPage = 1;
+  if (currentPage > pages) currentPage = pages;
+  syncFiltersToURL();
   const start = (currentPage-1)*PAGE_SIZE;
   const slice = filtered.slice(start, start+PAGE_SIZE);
   document.getElementById('list-meta').textContent =
@@ -946,10 +952,22 @@ function escAttr(s) { return escHtml(s); }
 function renderPagination(pages) {
   const pag = document.getElementById('pagination');
   if (pages<=1) { pag.innerHTML=''; return; }
+
+  const SIBLINGS = 2;
+  const pageNums = new Set([1, pages]);
+  for (let p=Math.max(1,currentPage-SIBLINGS); p<=Math.min(pages,currentPage+SIBLINGS); p++) pageNums.add(p);
+  const sorted = [...pageNums].sort((a,b)=>a-b);
+
   let html = `<button class="page-btn" id="prev-btn"${currentPage===1?' disabled':''}>← prev</button>`;
-  for (let p=1;p<=pages;p++) html+=`<button class="page-btn${p===currentPage?' active':''}" data-page="${p}">${p}</button>`;
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) html += `<button class="page-btn page-ellipsis" disabled>…</button>`;
+    html += `<button class="page-btn${p===currentPage?' active':''}" data-page="${p}">${p}</button>`;
+    prev = p;
+  }
   html += `<button class="page-btn" id="next-btn"${currentPage===pages?' disabled':''}>next →</button>`;
   pag.innerHTML = html;
+
   pag.querySelector('#prev-btn')?.addEventListener('click',()=>{currentPage--;renderPage();window.scrollTo(0,0);});
   pag.querySelector('#next-btn')?.addEventListener('click',()=>{currentPage++;renderPage();window.scrollTo(0,0);});
   pag.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{currentPage=Number(b.dataset.page);renderPage();window.scrollTo(0,0);}));
@@ -961,14 +979,15 @@ function renderPagination(pages) {
     document.querySelectorAll('.sort-opt').forEach(b=>b.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     sortKey=id.replace('sort-','');
+    currentPage=1;
     applyFiltersAndRender();
   });
 });
 
 let searchTimer;
-document.getElementById('search-input').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(applyFiltersAndRender,280);});
-document.getElementById('type-filter').addEventListener('change',applyFiltersAndRender);
-document.getElementById('year-filter').addEventListener('change',applyFiltersAndRender);
+document.getElementById('search-input').addEventListener('input',()=>{if(loading)return;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{currentPage=1;applyFiltersAndRender();},280);});
+document.getElementById('type-filter').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
+document.getElementById('year-filter').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
 
 // ── Repo metadata lookup ─────────────────────────────
 async function fetchClientMeta(clientId) {
@@ -1004,6 +1023,7 @@ function resetFilters() {
   url.searchParams.delete('q');
   url.searchParams.delete('type');
   url.searchParams.delete('year');
+  url.searchParams.delete('page');
   window.history.replaceState({}, '', url);
 }
 
@@ -1011,6 +1031,7 @@ async function loadRepository(clientId) {
   clientId = clientId.trim().toLowerCase();
   if (!clientId) return;
   CLIENT_ID = clientId;
+  loading = true;
 
   // Update repo input to show what's loading
   document.getElementById('repo-input').value = clientId;
@@ -1039,9 +1060,14 @@ async function loadRepository(clientId) {
     populateFilters(allDOIs);
     updateStats(allDOIs);
     applyFiltersFromURL();
+    // Read page LAST, after all filter state is set, so nothing can stomp it
+    const pageParam = parseInt(new URLSearchParams(window.location.search).get('page') || '1', 10);
+    currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+    loading = false;
     applyFiltersAndRender();
   } catch(err) {
     document.getElementById('doi-container').innerHTML = `<div class="error-state">Failed to load: ${escHtml(err.message)}</div>`;
+    loading = false;
     document.getElementById('list-meta').textContent = 'Error';
   }
 }

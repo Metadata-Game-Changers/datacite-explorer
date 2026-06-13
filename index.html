@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MGC DataCite Repository</title>
+  <title>Re-Curation Watch</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -51,17 +51,32 @@
       gap: 0;
     }
     .topbar-brand {
-      padding: 1rem 2rem 1rem 0;
+      padding: 0.6rem 2rem 0.6rem 0;
       border-right: 1px solid var(--rule);
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
+      gap: 0.2rem;
+      justify-content: center;
+    }
+    .brand-logo {
+      height: 48px;
+      width: auto;
+      display: block;
+    }
+    .brand-tool-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      margin-top: 0.1rem;
+      line-height: 1;
     }
     .brand-name {
       font-size: 0.95rem;
       font-weight: 600;
       letter-spacing: -0.01em;
       color: var(--ink);
+      display: none;
     }
     .brand-sub {
       font-family: var(--mono);
@@ -307,7 +322,7 @@
       display: flex;
       align-items: flex-end;
       gap: 3px;
-      height: 32px;
+      height: 48px;
       margin-bottom: 1.1rem;
     }
     .pulse-seg {
@@ -447,6 +462,57 @@
     }
     .error-state { color: var(--red); }
 
+
+    /* ── Topbar repo section ─────────────────────── */
+    .topbar-repo {
+      padding: 0 1.5rem;
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.2rem;
+    }
+
+    /* ── Repo switcher ───────────────────────────── */
+    .repo-form {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid var(--rule);
+      background: var(--white);
+    }
+    .repo-input {
+      border: none;
+      padding: 0.32rem 0.6rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink);
+      outline: none;
+      width: 160px;
+      background: transparent;
+    }
+    .repo-input::placeholder { color: var(--faint); }
+    .repo-go {
+      border: none;
+      border-left: 1px solid var(--rule);
+      background: none;
+      padding: 0.32rem 0.55rem;
+      font-size: 0.7rem;
+      color: var(--sub);
+      cursor: pointer;
+      font-family: var(--sans);
+      white-space: nowrap;
+    }
+    .repo-go:hover { background: var(--ink); color: var(--white); }
+    .repo-error {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--red);
+      margin-left: 0.5rem;
+      display: none;
+    }
+    .repo-error.show { display: inline; }
+
     @media (max-width: 640px) {
       .topbar-stats { flex-wrap: wrap; }
       .tstat { padding: 0.6rem 1rem; }
@@ -461,17 +527,27 @@
 <div class="topbar">
   <div class="topbar-inner">
     <div class="topbar-brand">
-      <span class="brand-name">Metadata Game Changers</span>
-      <span class="brand-sub">sjyq.oozvia · prefix 10.60950</span>
+      <a href="https://metadatagamechangers.com" target="_blank">
+        <img class="brand-logo" src="https://images.squarespace-cdn.com/content/v1/52ffa419e4b05b374032e6d9/1577498408185-9LMHCVUJMNL2UBCIUOB9/Metadata+Game+Changers+Logo-Light.png?format=300w" alt="Metadata Game Changers" />
+      </a>
+      <div class="brand-tool-name">Re-Curation Watch</div>
+      <span class="brand-name" id="brand-name" style="display:none">—</span>
+      <span class="brand-sub" id="brand-sub" style="display:none">—</span>
+    </div>
+    <div class="topbar-repo">
+      <div class="repo-form">
+        <input class="repo-input" id="repo-input" type="text" placeholder="client id, e.g. cern.zenodo" spellcheck="false" autocomplete="off" />
+        <button class="repo-go" id="repo-go">load →</button>
+      </div>
+      <span class="repo-error" id="repo-error">not found</span>
     </div>
     <div class="topbar-stats">
       <div class="tstat"><span class="tstat-n" id="stat-total">—</span><span class="tstat-l">Records</span></div>
       <div class="tstat"><span class="tstat-n" id="stat-types">—</span><span class="tstat-l">Types</span></div>
       <div class="tstat"><span class="tstat-n" id="stat-recent">—</span><span class="tstat-l">Latest year</span></div>
-      <div class="tstat"><span class="tstat-n" id="stat-schema">—</span><span class="tstat-l">Schema</span></div>
     </div>
     <div class="topbar-links">
-      <a href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">DataCite Commons ↗</a>
+      <a id="commons-link" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">Commons ↗</a>
       <a href="https://metadatagamechangers.com" target="_blank">MGC ↗</a>
     </div>
   </div>
@@ -502,10 +578,11 @@
 </div>
 
 <script>
-const CLIENT_ID = 'sjyq.oozvia';
 const API_BASE  = 'https://api.datacite.org';
 const PAGE_SIZE = 15;
+const DEFAULT_CLIENT = 'sjyq.oozvia';
 
+let CLIENT_ID   = DEFAULT_CLIENT;
 let allDOIs     = [];
 let filtered    = [];
 let currentPage = 1;
@@ -515,7 +592,7 @@ let expandedDOI = null;
 async function fetchAllDOIs() {
   let results = [], cursor = 1, total = null;
   while (true) {
-    const url = `${API_BASE}/dois?client-id=${CLIENT_ID}&page[size]=100&page[number]=${cursor}&sort=-updated`;
+    const url = `${API_BASE}/dois?client-id=${encodeURIComponent(CLIENT_ID)}&page[size]=100&page[number]=${cursor}&sort=-updated`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const json = await res.json();
@@ -550,14 +627,35 @@ function updateStats(dois) {
   document.getElementById('stat-types').textContent = new Set(dois.map(d=>d.attributes?.types?.resourceTypeGeneral).filter(Boolean)).size;
   const years = dois.map(d=>d.attributes?.publicationYear).filter(Boolean);
   document.getElementById('stat-recent').textContent = years.length ? Math.max(...years) : '—';
-  const schemas = [...new Set(dois.map(d=>d.attributes?.schemaVersion?.replace('http://datacite.org/schema/kernel-','v')??'').filter(Boolean))];
-  document.getElementById('stat-schema').textContent = schemas.length===1?schemas[0]:(schemas.length?schemas.join(', '):'—');
+
+}
+
+function syncFiltersToURL() {
+  const url = new URL(window.location.href);
+  const q    = document.getElementById('search-input').value.trim();
+  const type = document.getElementById('type-filter').value;
+  const year = document.getElementById('year-filter').value;
+  if (q)    url.searchParams.set('q', q);    else url.searchParams.delete('q');
+  if (type) url.searchParams.set('type', type); else url.searchParams.delete('type');
+  if (year) url.searchParams.set('year', year); else url.searchParams.delete('year');
+  window.history.replaceState({}, '', url);
+}
+
+function applyFiltersFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const q    = params.get('q') || '';
+  const type = params.get('type') || '';
+  const year = params.get('year') || '';
+  if (q)    document.getElementById('search-input').value = q;
+  if (type) document.getElementById('type-filter').value  = type;
+  if (year) document.getElementById('year-filter').value  = year;
 }
 
 function applyFiltersAndRender() {
   const q    = document.getElementById('search-input').value.toLowerCase();
   const type = document.getElementById('type-filter').value;
   const year = document.getElementById('year-filter').value;
+  syncFiltersToURL();
   filtered = allDOIs.filter(d => {
     const a = d.attributes ?? {};
     const title = a.titles?.[0]?.title ?? '';
@@ -791,17 +889,112 @@ document.getElementById('search-input').addEventListener('input',()=>{clearTimeo
 document.getElementById('type-filter').addEventListener('change',applyFiltersAndRender);
 document.getElementById('year-filter').addEventListener('change',applyFiltersAndRender);
 
-(async()=>{
+// ── Repo metadata lookup ─────────────────────────────
+async function fetchClientMeta(clientId) {
   try {
-    allDOIs = await fetchAllDOIs();
+    const res = await fetch(`${API_BASE}/clients/${encodeURIComponent(clientId)}`);
+    if (!res.ok) return null;
+    return (await res.json()).data ?? null;
+  } catch { return null; }
+}
+
+function updateBranding(clientId, meta) {
+  const name = meta?.attributes?.name ?? clientId;
+  const prefix = (meta?.attributes?.prefixIds ?? []).join(', ') || '—';
+  document.getElementById('brand-name').textContent = name;
+  document.getElementById('brand-sub').textContent = `${clientId} · prefix ${prefix}`;
+  document.title = `Re-Curation Watch · ${name}`;
+  const cl = document.getElementById('commons-link');
+  cl.href = `https://commons.datacite.org/repositories/${clientId}`;
+  // update URL bar without reload
+  const url = new URL(window.location.href);
+  url.searchParams.set('client', clientId);
+  window.history.replaceState({}, '', url);
+}
+
+function resetFilters() {
+  document.getElementById('search-input').value = '';
+  const tf = document.getElementById('type-filter');
+  const yf = document.getElementById('year-filter');
+  tf.innerHTML = '<option value="">All types</option>';
+  yf.innerHTML = '<option value="">All years</option>';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('q');
+  url.searchParams.delete('type');
+  url.searchParams.delete('year');
+  window.history.replaceState({}, '', url);
+}
+
+async function loadRepository(clientId) {
+  clientId = clientId.trim().toLowerCase();
+  if (!clientId) return;
+  CLIENT_ID = clientId;
+
+  // Update repo input to show what's loading
+  document.getElementById('repo-input').value = clientId;
+  document.getElementById('repo-error').classList.remove('show');
+  document.getElementById('doi-container').innerHTML = '<div class="loading-state">Fetching records…</div>';
+  document.getElementById('list-meta').textContent = 'Loading…';
+  document.getElementById('stat-total').textContent = '—';
+  document.getElementById('stat-types').textContent = '—';
+  document.getElementById('stat-recent').textContent = '—';
+  document.getElementById('brand-name').textContent = clientId;
+  document.getElementById('brand-sub').textContent = '…';
+  resetFilters();
+
+  try {
+    // Fetch client meta + DOIs in parallel
+    const [meta, dois] = await Promise.all([fetchClientMeta(clientId), fetchAllDOIs()]);
+    if (!dois.length && !meta) {
+      document.getElementById('repo-error').textContent = 'client not found';
+      document.getElementById('repo-error').classList.add('show');
+      document.getElementById('doi-container').innerHTML = '<div class="empty-state">No records found for that client ID.</div>';
+      document.getElementById('list-meta').textContent = '0 records';
+      return;
+    }
+    allDOIs = dois;
+    updateBranding(clientId, meta);
     populateFilters(allDOIs);
     updateStats(allDOIs);
+    applyFiltersFromURL();
     applyFiltersAndRender();
   } catch(err) {
-    document.getElementById('doi-container').innerHTML=`<div class="error-state">Failed to load: ${escHtml(err.message)}</div>`;
-    document.getElementById('list-meta').textContent='Error';
+    document.getElementById('doi-container').innerHTML = `<div class="error-state">Failed to load: ${escHtml(err.message)}</div>`;
+    document.getElementById('list-meta').textContent = 'Error';
   }
+}
+
+// ── Repo switcher events ──────────────────────────────
+document.getElementById('repo-go').addEventListener('click', () => {
+  const val = document.getElementById('repo-input').value.trim();
+  if (val) loadRepository(val);
+});
+document.getElementById('repo-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const val = document.getElementById('repo-input').value.trim();
+    if (val) loadRepository(val);
+  }
+});
+
+// ── Boot: check URL param, else load default ──────────
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const clientFromUrl = params.get('client');
+  await loadRepository(clientFromUrl || DEFAULT_CLIENT);
 })();
 </script>
+
+<!-- FOOTER -->
+<footer style="border-top:1px solid var(--rule);background:var(--off);padding:1rem 2rem;margin-top:2rem;">
+  <div style="max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <a href="https://metadatagamechangers.com" target="_blank">
+        <img src="https://images.squarespace-cdn.com/content/v1/52ffa419e4b05b374032e6d9/1577498408185-9LMHCVUJMNL2UBCIUOB9/Metadata+Game+Changers+Logo-Light.png?format=300w" alt="Metadata Game Changers" style="height:22px;width:auto;display:block;" />
+      </a>
+      <span style="font-size:0.72rem;color:var(--faint);">Re-Curation Watch · Created by <a href="https://metadatagamechangers.com" target="_blank" style="color:var(--sub);text-decoration:none;font-weight:500;">Metadata Game Changers</a> · Better Documentation | Better Data | Better Science</span>
+    </div>
+    <span style="font-family:var(--mono);font-size:0.65rem;color:var(--faint);">Live data from <a href="https://api.datacite.org" target="_blank" style="color:var(--blue);text-decoration:none;">api.datacite.org</a></span>
+  </div>
+</footer>
 </body>
 </html>

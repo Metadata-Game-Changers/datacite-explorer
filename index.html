@@ -673,7 +673,7 @@ let loading     = false;
 async function fetchAllDOIs() {
   let results = [], cursor = 1, total = null;
   while (true) {
-    const url = `${API_BASE}/dois?client-id=${encodeURIComponent(CLIENT_ID)}&page[size]=100&page[number]=${cursor}&sort=-updated`;
+    const url = `${API_BASE}/dois?client-id=${encodeURIComponent(CLIENT_ID)}&page[size]=1000&page[number]=${cursor}&sort=-updated`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const json = await res.json();
@@ -681,7 +681,7 @@ async function fetchAllDOIs() {
     results = results.concat(json.data ?? []);
     if (results.length >= total || !(json.data?.length)) break;
     cursor++;
-    if (cursor > 20) break;
+    if (cursor > 2) break;
   }
   return results;
 }

@@ -11,7 +11,7 @@ Live data is fetched directly from the [DataCite REST API](https://api.datacite.
 - **Before/after diff** for each change — field-level comparison showing what changed in each revision (URL, types, rights, related identifiers, dates, etc.)
 - **Revision pulse bar** — color-coded bar chart across the activity history, building left (oldest/green) to right (newest)
 - Filter by title, creator, or DOI string
-- Filter by resource type and publication year
+- Filter by resource type and last updated year
 - Sort by last updated, publication year, or title
 - URL-based state — repository, search query, type, and year filters are all reflected in the URL for bookmarking and sharing
 - Live stats: total records, resource types, most recent year

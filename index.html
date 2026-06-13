@@ -113,15 +113,17 @@
     .topbar-links {
       padding: 0 0 0 1.5rem;
       display: flex;
-      align-items: center;
-      gap: 1rem;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.25rem;
       margin-left: auto;
     }
     .topbar-links a {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: var(--sub);
       text-decoration: none;
       white-space: nowrap;
+      line-height: 1;
     }
     .topbar-links a:hover { color: var(--red); }
 
@@ -513,11 +515,67 @@
     }
     .repo-error.show { display: inline; }
 
-    @media (max-width: 640px) {
-      .topbar-stats { flex-wrap: wrap; }
-      .tstat { padding: 0.6rem 1rem; }
-      .diff-row { grid-template-columns: 90px 1fr; }
+    @media (max-width: 768px) {
+      /* ── Topbar: stack vertically ── */
+      .topbar { padding: 0 1rem; }
+      .topbar-inner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+      }
+      .topbar-brand {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+        border-right: none;
+        border-bottom: 1px solid var(--rule);
+      }
+      .brand-logo { height: 32px; }
+      .brand-tool-name { font-size: 1rem; }
+      .topbar-repo {
+        padding: 0.6rem 0;
+        border-right: none;
+        border-bottom: 1px solid var(--rule);
+      }
+      .repo-form { width: 100%; }
+      .repo-input { width: 100%; min-width: 0; flex: 1; }
+      .topbar-stats {
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--rule);
+      }
+      .tstat {
+        padding: 0.5rem 1rem;
+        flex: 1;
+        min-width: 80px;
+      }
+      .topbar-links {
+        flex-direction: row;
+        gap: 1rem;
+        padding: 0.6rem 0;
+        margin-left: 0;
+      }
+
+      /* ── Toolbar: wrap ── */
+      .toolbar { padding: 0 1rem; }
+      .toolbar-inner { gap: 0.5rem; padding: 0.5rem 0; }
+      .tb-input { min-width: 0; flex: 1; }
+      .tb-sep { display: none; }
+
+      /* ── Main ── */
+      .main { padding: 0 1rem 3rem; }
+
+      /* ── Cards ── */
+      .doi-row-main { grid-template-columns: 1fr; gap: 0.5rem; }
+      .toggle-btn { align-self: start; }
+
+      /* ── Activity diff ── */
+      .diff-row { grid-template-columns: 80px 1fr; }
+      .diff-before, .diff-after, .diff-new { max-width: 180px; }
       .tl-table { display: block; overflow-x: auto; }
+
+      /* ── Pagination ── */
+      .pagination { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -547,9 +605,9 @@
       <div class="tstat"><span class="tstat-n" id="stat-recent">—</span><span class="tstat-l">Latest year</span></div>
     </div>
     <div class="topbar-links">
-      <a id="commons-link" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">DataCite Commons ↗</a>
+      <a href="https://github.com/Metadata-Game-Changers/recuration-watch" target="_blank">GitHub ↗</a>
       <a href="https://metadatagamechangers.com" target="_blank">MGC ↗</a>
-      <a href="https://github.com/Metadata-Game-Changers/recuration-watch" target="_blank">ReadMe ↗</a>
+      <a id="commons-link" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">DataCite ↗</a>
     </div>
   </div>
 </div>

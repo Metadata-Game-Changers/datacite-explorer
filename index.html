@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metadata Game Changers · DataCite Repository</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Token system ─────────────────────────────── */
+    :root {
+      --navy:   #0D1B2A;
+      --slate:  #1E3A5F;
+      --blue:   #4A6FA5;
+      --gold:   #C9A84C;
+      --gold-lt:#E8C96A;
+      --cream:  #F8F5EE;
+      --mid:    #D4CFCA;
+      --ink:    #1A1814;
+      --muted:  #6B6560;
+      --green:  #3A7D5E;
+      --red:    #B05040;
+      --radius: 4px;
+      --mono:   'DM Mono', monospace;
+      --serif:  'Lora', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ───────────────────────────────────── */
+    header {
+      background: var(--navy);
+      color: var(--cream);
+      padding: 2.5rem 2rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--gold) 0%, var(--blue) 60%, transparent 100%);
+    }
+    .header-inner {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .header-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    header h1 {
+      font-family: var(--serif);
+      font-size: 1.85rem;
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: 0.4rem;
+    }
+    .header-sub {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--mid);
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      margin-top: 0.8rem;
+    }
+    .header-sub a {
+      color: var(--gold-lt);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .header-sub a:hover { border-color: var(--gold-lt); }
+    .header-pill {
+      background: rgba(201,168,76,0.18);
+      border: 1px solid rgba(201,168,76,0.4);
+      border-radius: 12px;
+      padding: 0.15rem 0.7rem;
+      font-size: 0.72rem;
+      color: var(--gold-lt);
+    }
+
+    /* ─── Stats bar ────────────────────────────────── */
+    .stats-bar {
+      background: var(--slate);
+      padding: 0.85rem 2rem;
+    }
+    .stats-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      gap: 2.5rem;
+      flex-wrap: wrap;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      color: var(--mid);
+      text-transform: uppercase;
+      margin-top: 0.2rem;
+    }
+
+    /* ─── Controls ─────────────────────────────────── */
+    .controls {
+      max-width: 960px;
+      margin: 1.8rem auto 0;
+      padding: 0 2rem;
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      background: white;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      padding: 0.55rem 0.75rem 0.55rem 2.2rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: var(--blue); }
+    .filter-select {
+      background: white;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      padding: 0.55rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--ink);
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-select:focus { border-color: var(--blue); }
+    .sort-btn {
+      background: white;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      padding: 0.55rem 0.85rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sort-btn:hover, .sort-btn.active {
+      border-color: var(--blue);
+      color: var(--blue);
+      background: rgba(74,111,165,0.06);
+    }
+
+    /* ─── DOI list ─────────────────────────────────── */
+    .doi-list {
+      max-width: 960px;
+      margin: 1.2rem auto 0;
+      padding: 0 2rem 3rem;
+    }
+    .list-meta {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      letter-spacing: 0.05em;
+    }
+
+    .doi-card {
+      background: white;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      margin-bottom: 0.9rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      overflow: hidden;
+    }
+    .doi-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 2px 12px rgba(13,27,42,0.07);
+    }
+    .doi-card-header {
+      padding: 1rem 1.2rem 0.8rem;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: start;
+    }
+    .doi-title {
+      font-family: var(--serif);
+      font-size: 0.98rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--ink);
+      margin-bottom: 0.3rem;
+    }
+    .doi-creators {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 0.4rem;
+    }
+    .doi-meta-row {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .doi-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      padding: 0.15rem 0.55rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .tag-type    { background: rgba(74,111,165,0.1); color: var(--blue); }
+    .tag-year    { background: rgba(201,168,76,0.12); color: #8B6E20; }
+    .tag-schema  { background: rgba(58,125,94,0.1); color: var(--green); }
+    .doi-id {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+    .doi-id a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+    .doi-id a:hover { text-decoration: underline; }
+
+    .expand-btn {
+      background: none;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      padding: 0.35rem 0.6rem;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
+    .expand-btn:hover, .expand-btn.open {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(201,168,76,0.06);
+    }
+    .expand-arrow { display: inline-block; transition: transform 0.2s; }
+    .expand-btn.open .expand-arrow { transform: rotate(180deg); }
+
+    /* ─── Activity panel ───────────────────────────── */
+    .activity-panel {
+      display: none;
+      border-top: 1.5px solid var(--mid);
+      background: #FAFAF7;
+      padding: 1.2rem 1.2rem 1rem;
+    }
+    .activity-panel.open { display: block; }
+
+    .activity-panel h4 {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.9rem;
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+    }
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 120px 16px 1fr;
+      gap: 0 0.8rem;
+      margin-bottom: 0.7rem;
+      align-items: start;
+    }
+    .tl-date {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: right;
+      padding-top: 0.1rem;
+    }
+    .tl-dot-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .tl-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 0.2rem;
+    }
+    .tl-line {
+      width: 1.5px;
+      flex: 1;
+      background: var(--mid);
+      min-height: 20px;
+    }
+    .tl-content {
+      padding-bottom: 0.4rem;
+    }
+    .tl-action {
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+    .tl-version {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .tl-changes {
+      margin-top: 0.35rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .change-chip {
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 2px;
+      background: rgba(74,111,165,0.1);
+      color: var(--blue);
+    }
+
+    /* Activity type colors */
+    .act-create  { background: var(--green); }
+    .act-update  { background: var(--blue); }
+    .act-publish { background: var(--gold); }
+    .act-hide    { background: var(--muted); }
+    .act-other   { background: var(--mid); }
+
+    /* Counts in header */
+    .doi-counts {
+      font-family: var(--mono);
+      font-size: 0.67rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+      display: flex;
+      gap: 1rem;
+    }
+    .count-item { display: flex; align-items: center; gap: 0.25rem; }
+    .count-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    /* Skeleton / loading */
+    .skeleton {
+      background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 3px;
+      height: 12px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .loading-state, .error-state, .empty-state {
+      text-align: center;
+      padding: 3rem 2rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .error-state { color: var(--red); }
+
+    /* ─── Pulse summary bar (signature element) ─── */
+    .pulse-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 28px;
+      margin-bottom: 0.7rem;
+    }
+    .pulse-seg {
+      flex: 1;
+      border-radius: 1px;
+      min-width: 3px;
+      transition: opacity 0.2s;
+    }
+
+    /* ─── Footer ───────────────────────────────────── */
+    footer {
+      background: var(--navy);
+      color: var(--mid);
+      text-align: center;
+      padding: 1.5rem 2rem;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+    }
+    footer a { color: var(--gold-lt); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ─── Pagination ───────────────────────────────── */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 0.6rem;
+      margin-top: 1.5rem;
+    }
+    .page-btn {
+      background: white;
+      border: 1.5px solid var(--mid);
+      border-radius: var(--radius);
+      padding: 0.45rem 0.9rem;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .page-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .page-btn.active { border-color: var(--navy); background: var(--navy); color: var(--gold); }
+    .page-btn:disabled { opacity: 0.4; cursor: default; }
+
+    @media (max-width: 600px) {
+      .doi-card-header { grid-template-columns: 1fr; }
+      .timeline-item { grid-template-columns: 90px 14px 1fr; }
+      .stats-inner { gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="header-inner">
+    <p class="header-eyebrow">DataCite Repository · sjyq.oozvia</p>
+    <h1>Metadata Game Changers</h1>
+    <div class="header-sub">
+      <a href="https://metadatagamechangers.com" target="_blank">metadatagamechangers.com</a>
+      <span>·</span>
+      <a href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">DataCite Commons ↗</a>
+      <span class="header-pill">10.60950 prefix</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ STATS BAR ════════════════════════════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat">
+      <span class="stat-value" id="stat-total">—</span>
+      <span class="stat-label">Total DOIs</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" id="stat-types">—</span>
+      <span class="stat-label">Resource Types</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" id="stat-recent">—</span>
+      <span class="stat-label">Most Recent Year</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" id="stat-schema">—</span>
+      <span class="stat-label">Schema Version</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONTROLS ════════════════════════════════════════════════════════════ -->
+<div class="controls">
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input class="search-input" id="search-input" type="text" placeholder="Search titles, creators, DOIs…" />
+  </div>
+  <select class="filter-select" id="type-filter">
+    <option value="">All types</option>
+  </select>
+  <select class="filter-select" id="year-filter">
+    <option value="">All years</option>
+  </select>
+  <button class="sort-btn active" id="sort-updated">Updated ↓</button>
+  <button class="sort-btn" id="sort-year">Year</button>
+  <button class="sort-btn" id="sort-title">Title</button>
+</div>
+
+<!-- ═══ DOI LIST ═════════════════════════════════════════════════════════════ -->
+<div class="doi-list">
+  <div class="list-meta" id="list-meta">Loading…</div>
+  <div id="doi-container">
+    <div class="loading-state">Fetching MGC repository from DataCite API…</div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- ═══ FOOTER ══════════════════════════════════════════════════════════════ -->
+<footer>
+  Live data from <a href="https://api.datacite.org" target="_blank">api.datacite.org</a> · 
+  Repository <strong>sjyq.oozvia</strong> · 
+  <a href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">View on DataCite Commons</a>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+const CLIENT_ID = 'sjyq.oozvia';
+const API_BASE  = 'https://api.datacite.org';
+const PAGE_SIZE = 15;
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let allDOIs     = [];
+let filtered    = [];
+let currentPage = 1;
+let sortKey     = 'updated';
+let expandedDOI = null;
+
+// ═══════════════════════════════════════════════════════
+//  FETCH ALL DOIs FOR CLIENT
+// ═══════════════════════════════════════════════════════
+async function fetchAllDOIs() {
+  let results = [];
+  let cursor  = 1;
+  let total   = null;
+
+  try {
+    while (true) {
+      const url = `${API_BASE}/dois?client-id=${CLIENT_ID}&page[size]=100&page[number]=${cursor}&sort=-updated`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+
+      if (total === null) total = json.meta?.total ?? 0;
+      results = results.concat(json.data ?? []);
+
+      if (results.length >= total || !(json.data?.length)) break;
+      cursor++;
+      if (cursor > 20) break; // safety cap
+    }
+    return results;
+  } catch (e) {
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  FETCH ACTIVITIES FOR A SINGLE DOI
+// ═══════════════════════════════════════════════════════
+async function fetchActivities(doiId) {
+  const encoded = encodeURIComponent(doiId);
+  const url = `${API_BASE}/dois/${encoded}/activities`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    return json.data ?? [];
+  } catch (e) {
+    return null; // null = error
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  POPULATE FILTERS
+// ═══════════════════════════════════════════════════════
+function populateFilters(dois) {
+  const types = [...new Set(
+    dois.map(d => d.attributes?.types?.resourceTypeGeneral).filter(Boolean)
+  )].sort();
+  const years = [...new Set(
+    dois.map(d => d.attributes?.publicationYear).filter(Boolean)
+  )].sort((a,b) => b - a);
+
+  const typeSelect = document.getElementById('type-filter');
+  types.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    typeSelect.appendChild(opt);
+  });
+
+  const yearSelect = document.getElementById('year-filter');
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSelect.appendChild(opt);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATS BAR
+// ═══════════════════════════════════════════════════════
+function updateStats(dois) {
+  document.getElementById('stat-total').textContent = dois.length;
+
+  const types = new Set(
+    dois.map(d => d.attributes?.types?.resourceTypeGeneral).filter(Boolean)
+  );
+  document.getElementById('stat-types').textContent = types.size;
+
+  const years = dois.map(d => d.attributes?.publicationYear).filter(Boolean);
+  document.getElementById('stat-recent').textContent =
+    years.length ? Math.max(...years) : '—';
+
+  const schemas = [...new Set(
+    dois.map(d => d.attributes?.schemaVersion?.replace('http://datacite.org/schema/kernel-','v') ?? '').filter(Boolean)
+  )];
+  document.getElementById('stat-schema').textContent =
+    schemas.length === 1 ? schemas[0] : (schemas.length ? schemas.join(', ') : '—');
+}
+
+// ═══════════════════════════════════════════════════════
+//  FILTER + SORT + RENDER
+// ═══════════════════════════════════════════════════════
+function applyFiltersAndRender() {
+  const q    = document.getElementById('search-input').value.toLowerCase();
+  const type = document.getElementById('type-filter').value;
+  const year = document.getElementById('year-filter').value;
+
+  filtered = allDOIs.filter(d => {
+    const attrs = d.attributes ?? {};
+    const title = attrs.titles?.[0]?.title ?? '';
+    const creators = (attrs.creators ?? []).map(c => c.name).join(' ');
+    const doi = d.id ?? '';
+    const matchQ = !q || [title, creators, doi].join(' ').toLowerCase().includes(q);
+    const matchType = !type || attrs.types?.resourceTypeGeneral === type;
+    const matchYear = !year || String(attrs.publicationYear) === year;
+    return matchQ && matchType && matchYear;
+  });
+
+  // sort
+  filtered.sort((a, b) => {
+    if (sortKey === 'updated') {
+      return new Date(b.attributes?.updated ?? 0) - new Date(a.attributes?.updated ?? 0);
+    }
+    if (sortKey === 'year') {
+      return (b.attributes?.publicationYear ?? 0) - (a.attributes?.publicationYear ?? 0);
+    }
+    if (sortKey === 'title') {
+      return (a.attributes?.titles?.[0]?.title ?? '').localeCompare(
+              b.attributes?.titles?.[0]?.title ?? '');
+    }
+    return 0;
+  });
+
+  currentPage = 1;
+  renderPage();
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER PAGE
+// ═══════════════════════════════════════════════════════
+function renderPage() {
+  const total   = filtered.length;
+  const pages   = Math.ceil(total / PAGE_SIZE);
+  const start   = (currentPage - 1) * PAGE_SIZE;
+  const slice   = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('list-meta').textContent =
+    `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total} records`;
+
+  const container = document.getElementById('doi-container');
+  if (!total) {
+    container.innerHTML = '<div class="empty-state">No records match your filters.</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = slice.map(d => renderCard(d)).join('');
+
+  // Re-attach expand listeners
+  container.querySelectorAll('.expand-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const doiId = btn.dataset.doi;
+      toggleActivity(doiId);
+    });
+  });
+
+  renderPagination(pages);
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER SINGLE CARD
+// ═══════════════════════════════════════════════════════
+function renderCard(d) {
+  const attrs     = d.attributes ?? {};
+  const doi       = d.id ?? '';
+  const title     = attrs.titles?.[0]?.title ?? '(Untitled)';
+  const creators  = (attrs.creators ?? []).map(c => c.name).join(', ') || '—';
+  const year      = attrs.publicationYear ?? '';
+  const typeG     = attrs.types?.resourceTypeGeneral ?? '';
+  const typeS     = attrs.types?.resourceType ?? '';
+  const schema    = attrs.schemaVersion?.replace('http://datacite.org/schema/kernel-','v') ?? '';
+  const updated   = attrs.updated ? fmtDate(attrs.updated) : '';
+  const views     = attrs.viewCount ?? 0;
+  const citations = attrs.citationCount ?? 0;
+  const downloads = attrs.downloadCount ?? 0;
+
+  return `
+    <div class="doi-card" id="card-${sanitizeId(doi)}">
+      <div class="doi-card-header">
+        <div>
+          <div class="doi-title">${escHtml(title)}</div>
+          <div class="doi-creators">${escHtml(creators)}</div>
+          <div class="doi-meta-row">
+            ${typeG ? `<span class="doi-tag tag-type">${escHtml(typeG)}</span>` : ''}
+            ${typeS && typeS !== typeG ? `<span class="doi-tag tag-type" style="opacity:0.7">${escHtml(typeS)}</span>` : ''}
+            ${year  ? `<span class="doi-tag tag-year">${year}</span>` : ''}
+            ${schema ? `<span class="doi-tag tag-schema">${escHtml(schema)}</span>` : ''}
+          </div>
+          <div class="doi-id">
+            <a href="https://doi.org/${doi}" target="_blank">doi.org/${doi}</a>
+            ${updated ? `<span style="margin-left:0.8rem;color:var(--muted)">updated ${updated}</span>` : ''}
+          </div>
+          <div class="doi-counts">
+            <span class="count-item"><span class="count-dot" style="background:var(--blue)"></span> ${views} views</span>
+            <span class="count-item"><span class="count-dot" style="background:var(--gold)"></span> ${citations} citations</span>
+            <span class="count-item"><span class="count-dot" style="background:var(--green)"></span> ${downloads} downloads</span>
+          </div>
+        </div>
+        <button class="expand-btn" data-doi="${escAttr(doi)}" aria-expanded="false">
+          Activity <span class="expand-arrow">▾</span>
+        </button>
+      </div>
+      <div class="activity-panel" id="act-${sanitizeId(doi)}">
+        <div class="loading-state" style="padding:1rem">Loading activity…</div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOGGLE ACTIVITY PANEL
+// ═══════════════════════════════════════════════════════
+async function toggleActivity(doiId) {
+  const safeId  = sanitizeId(doiId);
+  const panel   = document.getElementById(`act-${safeId}`);
+  const btn     = document.querySelector(`.expand-btn[data-doi="${escAttr(doiId)}"]`);
+  if (!panel || !btn) return;
+
+  const isOpen = panel.classList.contains('open');
+
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+
+  panel.classList.add('open');
+  btn.classList.add('open');
+  btn.setAttribute('aria-expanded', 'true');
+
+  // Only fetch once
+  if (panel.dataset.loaded) return;
+  panel.dataset.loaded = 'true';
+
+  const activities = await fetchActivities(doiId);
+  renderActivities(panel, doiId, activities);
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER ACTIVITIES
+// ═══════════════════════════════════════════════════════
+function renderActivities(panel, doiId, activities) {
+  if (activities === null) {
+    panel.innerHTML = `<div class="error-state">Could not load activities for ${doiId}</div>`;
+    return;
+  }
+  if (!activities.length) {
+    panel.innerHTML = `<h4>Activity Log</h4><div class="empty-state" style="padding:0.5rem 0">No activity records found.</div>`;
+    return;
+  }
+
+  // Build pulse bar — one segment per activity, height ∝ recency
+  const n     = activities.length;
+  const pulse = activities.map((a, i) => {
+    const action  = (a.attributes?.action ?? '').toLowerCase();
+    const color   = actionColor(action);
+    const height  = Math.max(20, Math.round(28 * (i + 1) / n));
+    return `<div class="pulse-seg" style="height:${height}px;background:${color};opacity:0.75" title="${action}"></div>`;
+  }).join('');
+
+  const timelineItems = activities.map((a, i) => {
+    const attrs    = a.attributes ?? {};
+    const action   = attrs.action ?? 'update';
+    const ts       = attrs.createdAt ?? attrs.updatedAt ?? '';
+    const version  = attrs.version ?? '';
+    const changes  = collectChanges(attrs);
+    const dotClass = `act-${action.toLowerCase().replace(/[^a-z]/g,'') || 'other'}`;
+    const isLast   = i === activities.length - 1;
+
+    return `
+      <div class="timeline-item">
+        <div class="tl-date">${ts ? fmtDateLong(ts) : '—'}</div>
+        <div class="tl-dot-col">
+          <div class="tl-dot ${dotClass}"></div>
+          ${!isLast ? '<div class="tl-line"></div>' : ''}
+        </div>
+        <div class="tl-content">
+          <div class="tl-action" style="color:${actionColor(action)}">${capitalise(action)}</div>
+          ${version ? `<div class="tl-version">schema v${version}</div>` : ''}
+          ${changes.length ? `
+            <div class="tl-changes">
+              ${changes.map(c => `<span class="change-chip">${escHtml(c)}</span>`).join('')}
+            </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <h4>Activity Log · ${n} event${n !== 1 ? 's' : ''}</h4>
+    <div class="pulse-bar">${pulse}</div>
+    <div class="timeline">${timelineItems}</div>
+    <div style="margin-top:0.8rem">
+      <a href="https://api.datacite.org/dois/${encodeURIComponent(doiId)}/activities"
+         target="_blank"
+         style="font-family:var(--mono);font-size:0.68rem;color:var(--blue);text-decoration:none">
+        View raw activity JSON ↗
+      </a>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function actionColor(action) {
+  const a = action.toLowerCase();
+  if (a.includes('create'))  return 'var(--green)';
+  if (a.includes('publish')) return 'var(--gold)';
+  if (a.includes('update'))  return 'var(--blue)';
+  if (a.includes('hide'))    return 'var(--muted)';
+  if (a.includes('register'))return '#7B5EA7';
+  return 'var(--muted)';
+}
+
+function collectChanges(attrs) {
+  // DataCite activities may include a "changes" or diff field
+  const raw = attrs.changes ?? attrs.patchJson ?? null;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.slice(0, 8).map(c => String(c));
+  if (typeof raw === 'object') return Object.keys(raw).slice(0, 8);
+  return [];
+}
+
+function fmtDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+  } catch { return iso; }
+}
+function fmtDateLong(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+  } catch { return iso; }
+}
+function capitalise(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function sanitizeId(s) { return s.replace(/[^a-zA-Z0-9-_]/g, '-'); }
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return escHtml(s); }
+
+// ═══════════════════════════════════════════════════════
+//  PAGINATION
+// ═══════════════════════════════════════════════════════
+function renderPagination(pages) {
+  const pag = document.getElementById('pagination');
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" id="prev-btn" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>`;
+  for (let p = 1; p <= pages; p++) {
+    html += `<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+  }
+  html += `<button class="page-btn" id="next-btn" ${currentPage === pages ? 'disabled' : ''}>Next →</button>`;
+  pag.innerHTML = html;
+
+  pag.querySelector('#prev-btn')?.addEventListener('click', () => { currentPage--; renderPage(); window.scrollTo(0,0); });
+  pag.querySelector('#next-btn')?.addEventListener('click', () => { currentPage++; renderPage(); window.scrollTo(0,0); });
+  pag.querySelectorAll('[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => { currentPage = Number(btn.dataset.page); renderPage(); window.scrollTo(0,0); });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  SORT BUTTONS
+// ═══════════════════════════════════════════════════════
+['sort-updated','sort-year','sort-title'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    sortKey = id.replace('sort-','');
+    applyFiltersAndRender();
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  SEARCH + FILTERS
+// ═══════════════════════════════════════════════════════
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFiltersAndRender, 280);
+});
+document.getElementById('type-filter').addEventListener('change', applyFiltersAndRender);
+document.getElementById('year-filter').addEventListener('change', applyFiltersAndRender);
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+(async () => {
+  try {
+    allDOIs = await fetchAllDOIs();
+    populateFilters(allDOIs);
+    updateStats(allDOIs);
+    applyFiltersAndRender();
+  } catch (err) {
+    document.getElementById('doi-container').innerHTML =
+      `<div class="error-state">Failed to load DOIs from DataCite API.<br><small>${escHtml(err.message)}</small></div>`;
+    document.getElementById('list-meta').textContent = 'Error';
+  }
+})();
+</script>
+</body>
+</html>

@@ -370,6 +370,26 @@
       font-size: 0.7rem;
       font-weight: 500;
     }
+    .act-summary {
+      font-size: 0.78rem;
+      color: var(--sub);
+      line-height: 1.4;
+    }
+    .act-summary strong { color: var(--ink); font-weight: 600; }
+    .act-toggle {
+      font-size: 0.7rem;
+      color: var(--blue);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      margin-top: 0.3rem;
+      display: block;
+      font-family: var(--sans);
+    }
+    .act-toggle:hover { text-decoration: underline; }
+    .act-detail { display: none; margin-top: 0.5rem; }
+    .act-detail.open { display: block; }
     .act-v {
       font-family: var(--mono);
       font-size: 0.6rem;
@@ -825,6 +845,18 @@ async function toggleActivity(doiId) {
   renderActivities(panel, doiId, activities);
 }
 
+function changeSummary(changes, action) {
+  if (!changes || typeof changes !== 'object') return '';
+  const SKIP = new Set(['doi','regenerate','only_validate','should_validate','aasm_state','content_url','landing_page','container','reason','source']);
+  if (action === 'create') {
+    const title = changes.titles?.[0]?.title ?? '';
+    return 'DOI registered' + (title ? ': <strong>' + escHtml(title) + '</strong>' : '') + '.';
+  }
+  const keys = Object.keys(changes).filter(k => !SKIP.has(k));
+  if (!keys.length) return 'Metadata updated.';
+  return 'Updated ' + keys.map(k => '<strong>' + escHtml(fieldLabel(k)) + '</strong>').join(', ') + '.';
+}
+
 function renderActivities(panel, doiId, activities) {
   if (activities===null) { panel.innerHTML=`<div class="error-state">Could not load activities.</div>`; return; }
   if (!activities.length) { panel.innerHTML=`<div class="empty-state">No activity records.</div>`; return; }
@@ -841,12 +873,14 @@ function renderActivities(panel, doiId, activities) {
   }).join('');
 
   const rows = activities.map((a,i)=>{
-    const attrs  = a.attributes ?? {};
-    const action = attrs.action ?? 'update';
-    const ts     = attrs['prov:generatedAtTime'] ?? attrs.createdAt ?? '';
+    const attrs   = a.attributes ?? {};
+    const action  = attrs.action ?? 'update';
+    const ts      = attrs['prov:generatedAtTime'] ?? attrs.createdAt ?? '';
     const version = attrs.version ?? '';
     const dotColor = actionColor(action);
-    const changesHtml = renderChangesDiff(attrs.changes, action);
+    const summary  = changeSummary(attrs.changes, action);
+    const detail   = renderChangesDiff(attrs.changes, action);
+    const uid = `detail-${sanitizeId(doiId)}-${i}`;
     return `<tr>
       <td class="tl-col-date">${ts?fmtDate(ts):'—'}</td>
       <td class="tl-col-dot"><div class="tl-dot-wrap"><div class="tl-dot" style="background:${dotColor}"></div></div></td>
@@ -854,7 +888,10 @@ function renderActivities(panel, doiId, activities) {
         <div class="act-label" style="color:${dotColor}">${escHtml(capitalise(action))}</div>
         ${version?`<div class="act-v">v${version}</div>`:''}
       </td>
-      <td class="tl-col-changes">${changesHtml}</td>
+      <td class="tl-col-changes">
+        <div class="act-summary">${summary}</div>
+        ${detail ? `<button class="act-toggle" data-target="${uid}">Show details ▸</button><div class="act-detail" id="${uid}">${detail}</div>` : ''}
+      </td>
     </tr>`;
   }).join('');
 
@@ -865,7 +902,18 @@ function renderActivities(panel, doiId, activities) {
     </div>
     <div class="pulse-bar">${pulse}</div>
     <table class="tl-table"><tbody>${rows}</tbody></table>`;
+
+  // Wire up toggle buttons
+  panel.querySelectorAll('.act-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const detail = document.getElementById(btn.dataset.target);
+      if (!detail) return;
+      const open = detail.classList.toggle('open');
+      btn.textContent = open ? 'Hide details ▾' : 'Show details ▸';
+    });
+  });
 }
+
 
 // ── Action color ─────────────────────────────────────
 function actionColor(action) {

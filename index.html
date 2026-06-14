@@ -528,13 +528,16 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 0.2rem;
+      gap: 0.25rem;
+      position: relative;
+      min-width: 280px;
     }
     .repo-label {
       font-size: 0.62rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--faint);
+      color: var(--blue);
+      font-weight: 500;
     }
     .repo-below {
       display: flex;
@@ -547,6 +550,53 @@
       text-decoration: none;
     }
     .repo-below a:hover { text-decoration: underline; }
+
+    /* ── Autocomplete dropdown ───────────────────── */
+    .repo-autocomplete {
+      position: absolute;
+      top: 100%;
+      left: 1.5rem;
+      right: 0;
+      background: var(--white);
+      border: 1.5px solid var(--ink);
+      border-top: none;
+      z-index: 200;
+      display: none;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .repo-autocomplete.open { display: block; }
+    .repo-ac-item {
+      padding: 0.55rem 0.75rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+    .repo-ac-item:last-child { border-bottom: none; }
+    .repo-ac-item:hover, .repo-ac-item.highlighted { background: var(--off); }
+    .repo-ac-name {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .repo-ac-id {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--faint);
+    }
+    .repo-ac-count {
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: var(--blue);
+    }
+    .repo-ac-loading {
+      padding: 0.6rem 0.75rem;
+      font-size: 0.75rem;
+      color: var(--faint);
+      font-style: italic;
+    }
 
     /* ── Repo switcher ───────────────────────────── */
     .repo-form {
@@ -563,7 +613,7 @@
       font-size: 0.72rem;
       color: var(--ink);
       outline: none;
-      width: 160px;
+      width: 200px;
       background: transparent;
     }
     .repo-input::placeholder { color: var(--faint); }
@@ -666,15 +716,16 @@
       <span class="brand-sub" id="brand-sub" style="display:none">—</span>
     </div>
     <div class="topbar-repo">
-      <span class="repo-label">Repository ID</span>
+      <span class="repo-label">Browse any DataCite repository</span>
       <div class="repo-form">
-        <input class="repo-input" id="repo-input" type="text" placeholder="e.g. cern.zenodo" spellcheck="false" autocomplete="off" />
+        <input class="repo-input" id="repo-input" type="text" placeholder="Search by name or enter client ID…" spellcheck="false" autocomplete="off" />
         <button class="repo-go" id="repo-go">load →</button>
       </div>
       <div class="repo-below">
         <a id="commons-link-repo" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank">DataCite Commons ↗</a>
         <span class="repo-error" id="repo-error">not found</span>
       </div>
+      <div class="repo-autocomplete" id="repo-autocomplete"></div>
     </div>
     <div class="topbar-stats">
       <div class="tstat"><span class="tstat-n" id="stat-total">—</span><span class="tstat-l">Records</span></div>
@@ -1149,16 +1200,104 @@ async function loadRepository(clientId) {
   }
 }
 
+// ── Autocomplete ─────────────────────────────────────
+let acTimer, acHighlight = -1, acItems = [];
+
+async function searchClients(q) {
+  try {
+    const res = await fetch(`${API_BASE}/clients?query=${encodeURIComponent(q)}&page[size]=8`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data ?? []).map(d => ({
+      id:    d.id,
+      name:  d.attributes?.name ?? d.id,
+      count: d.attributes?.doiCount ?? null
+    }));
+  } catch { return []; }
+}
+
+function showAutocomplete(items) {
+  const box = document.getElementById('repo-autocomplete');
+  acItems = items;
+  acHighlight = -1;
+  if (!items.length) { box.classList.remove('open'); return; }
+  box.innerHTML = items.map((it, i) =>
+    `<div class="repo-ac-item" data-id="${escAttr(it.id)}" data-idx="${i}">
+      <span class="repo-ac-name">${escHtml(it.name)}</span>
+      <span class="repo-ac-id">${escHtml(it.id)}</span>
+      ${it.count != null ? `<span class="repo-ac-count">${it.count.toLocaleString()} DOIs</span>` : ''}
+    </div>`
+  ).join('');
+  box.classList.add('open');
+  box.querySelectorAll('.repo-ac-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const id = el.dataset.id;
+      document.getElementById('repo-input').value = id;
+      box.classList.remove('open');
+      loadRepository(id);
+    });
+  });
+}
+
+function closeAutocomplete() {
+  document.getElementById('repo-autocomplete').classList.remove('open');
+  acHighlight = -1;
+}
+
+document.getElementById('repo-input').addEventListener('input', () => {
+  const q = document.getElementById('repo-input').value.trim();
+  clearTimeout(acTimer);
+  if (q.length < 2) { closeAutocomplete(); return; }
+  document.getElementById('repo-autocomplete').innerHTML = '<div class="repo-ac-loading">Searching…</div>';
+  document.getElementById('repo-autocomplete').classList.add('open');
+  acTimer = setTimeout(async () => {
+    const items = await searchClients(q);
+    showAutocomplete(items);
+  }, 300);
+});
+
+document.getElementById('repo-input').addEventListener('keydown', e => {
+  const box = document.getElementById('repo-autocomplete');
+  const open = box.classList.contains('open');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (open && acHighlight < acItems.length - 1) {
+      acHighlight++;
+      box.querySelectorAll('.repo-ac-item').forEach((el,i) => el.classList.toggle('highlighted', i===acHighlight));
+    }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (open && acHighlight > 0) {
+      acHighlight--;
+      box.querySelectorAll('.repo-ac-item').forEach((el,i) => el.classList.toggle('highlighted', i===acHighlight));
+    }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (open && acHighlight >= 0 && acItems[acHighlight]) {
+      const id = acItems[acHighlight].id;
+      document.getElementById('repo-input').value = id;
+      closeAutocomplete();
+      loadRepository(id);
+    } else {
+      const val = document.getElementById('repo-input').value.trim();
+      closeAutocomplete();
+      if (val) loadRepository(val);
+    }
+  } else if (e.key === 'Escape') {
+    closeAutocomplete();
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.topbar-repo')) closeAutocomplete();
+});
+
 // ── Repo switcher events ──────────────────────────────
 document.getElementById('repo-go').addEventListener('click', () => {
   const val = document.getElementById('repo-input').value.trim();
+  closeAutocomplete();
   if (val) loadRepository(val);
-});
-document.getElementById('repo-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const val = document.getElementById('repo-input').value.trim();
-    if (val) loadRepository(val);
-  }
 });
 
 // ── Boot: check URL param, else load default ──────────

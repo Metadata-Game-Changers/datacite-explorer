@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="favicon_MGC.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --white:   #ffffff;
@@ -68,7 +68,7 @@
     .brand-tool-name {
       font-family: 'Montserrat', sans-serif;
       font-size: 2rem;
-      font-weight: 800;
+      font-weight: 400;
       letter-spacing: 0.02em;
       color: #673289;
       line-height: 1;
@@ -215,6 +215,49 @@
       display: flex;
       align-items: baseline;
       gap: 0.35rem;
+    }
+    .rstat-spark {
+      flex-direction: row;
+      align-items: flex-end;
+      gap: 0.5rem;
+    }
+    .spark-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      height: 24px;
+      min-width: 80px;
+    }
+    .spark-seg {
+      flex: 1;
+      min-width: 3px;
+      background: #9167b0;
+      border-radius: 1px 1px 0 0;
+      cursor: default;
+      opacity: 0.7;
+      transition: opacity 0.1s;
+    }
+    .spark-seg:hover { opacity: 1; }
+
+    /* Inline version bar on DOI card */
+    .version-bar-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-left: 0.8rem;
+      vertical-align: middle;
+    }
+    .version-bar-track {
+      width: 48px;
+      height: 4px;
+      background: var(--rule);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .version-bar-fill {
+      height: 100%;
+      background: #9167b0;
+      border-radius: 2px;
     }
     .rstat-n {
       font-size: 0.95rem;
@@ -375,12 +418,12 @@
       font-variant-numeric: tabular-nums;
     }
     .doi-counts span { margin-right: 0.9rem; }
-    .doi-counts .tip {
+    .tip {
       position: relative;
       cursor: help;
       border-bottom: 1px dotted var(--rule-dk);
     }
-    .doi-counts .tip::after {
+    .tip::after {
       content: attr(data-tip);
       position: absolute;
       bottom: 125%;
@@ -397,7 +440,7 @@
       transition: opacity 0.15s;
       z-index: 10;
     }
-    .doi-counts .tip:hover::after { opacity: 1; }
+    .tip:hover::after { opacity: 1; }
 
     .toggle-btn {
       font-size: 0.7rem;
@@ -542,38 +585,42 @@
       line-height: 1.3;
     }
     .diff-values {
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: 0.3rem;
+      display: block;
       font-family: var(--mono);
       font-size: 0.67rem;
     }
     .diff-before {
       background: var(--red-bg);
       color: #991b1b;
-      padding: 0.1rem 0.35rem;
+      padding: 0.3rem 0.5rem;
       text-decoration: line-through;
       word-break: break-word;
-      white-space: normal;
-      display: inline;
+      white-space: pre-wrap;
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.67rem;
+      margin-bottom: 0.25rem;
     }
-    .diff-arrow { color: var(--rule-dk); font-size: 0.6rem; }
+    .diff-arrow { color: var(--rule-dk); font-size: 0.7rem; display: block; margin: 0.1rem 0; }
     .diff-after {
       background: var(--green-bg);
       color: #166534;
-      padding: 0.1rem 0.35rem;
+      padding: 0.3rem 0.5rem;
       word-break: break-word;
-      white-space: normal;
-      display: inline;
+      white-space: pre-wrap;
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.67rem;
     }
     .diff-new {
       background: var(--blue-bg);
       color: #1e40af;
-      padding: 0.1rem 0.35rem;
+      padding: 0.3rem 0.5rem;
       word-break: break-word;
-      white-space: normal;
-      display: inline;
+      white-space: pre-wrap;
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.67rem;
     }
     .tl-version { display: inline; }
 
@@ -915,6 +962,10 @@
       <span class="rstat"><span class="rstat-n" id="stat-total">—</span><span class="rstat-l">Records</span></span>
       <span class="rstat"><span class="rstat-n" id="stat-types">—</span><span class="rstat-l">Types</span></span>
       <span class="rstat"><span class="rstat-n" id="stat-recent">—</span><span class="rstat-l">Latest updated</span></span>
+      <span class="rstat rstat-spark" id="rstat-spark" style="display:none">
+        <div class="spark-bar" id="spark-bar"></div>
+        <span class="rstat-l">Version distribution</span>
+      </span>
     </div>
   </div>
 </div>
@@ -965,6 +1016,7 @@ let sortKey     = 'updated';
 let expandedDOI = null;
 let loading     = false;
 let versionMin  = 0;
+let maxVersion  = 1;
 let recuratedOnly = false;
 let createdOnly = false;
 async function fetchAllDOIs() {
@@ -1028,12 +1080,45 @@ function populateVersionDropdown(baseDois) {
 }
 
 
+function updateSparkline(dois) {
+  // Build version frequency buckets
+  const versions = dois.map(d => d.attributes?.metadataVersion ?? 1).filter(v => v >= 1);
+  if (!versions.length) return;
+  maxVersion = Math.max(...versions);
+
+  // Group into at most 20 buckets
+  const MAX_BUCKETS = 20;
+  const bucketSize = Math.max(1, Math.ceil(maxVersion / MAX_BUCKETS));
+  const buckets = {};
+  versions.forEach(v => {
+    const bucket = Math.floor((v - 1) / bucketSize);
+    buckets[bucket] = (buckets[bucket] || 0) + 1;
+  });
+  const bucketKeys = Object.keys(buckets).map(Number).sort((a,b)=>a-b);
+  const maxCount = Math.max(...Object.values(buckets));
+
+  const bar = document.getElementById('spark-bar');
+  const wrap = document.getElementById('rstat-spark');
+  if (!bar || !wrap) return;
+
+  bar.innerHTML = bucketKeys.map(k => {
+    const count = buckets[k];
+    const h = Math.max(2, Math.round((count / maxCount) * 24));
+    const lo = k * bucketSize + 1;
+    const hi = Math.min((k + 1) * bucketSize, maxVersion);
+    const label = lo === hi ? `v${lo}: ${count} DOIs` : `v${lo}–${hi}: ${count} DOIs`;
+    return `<div class="spark-seg" style="height:${h}px" title="${label}"></div>`;
+  }).join('');
+
+  wrap.style.display = '';
+}
+
 function updateStats(dois) {
   document.getElementById('stat-total').textContent = dois.length;
   document.getElementById('stat-types').textContent = new Set(dois.map(d=>d.attributes?.types?.resourceTypeGeneral).filter(Boolean)).size;
   const years = dois.map(d=>d.attributes?.updated ? new Date(d.attributes.updated).getFullYear() : null).filter(Boolean);
   document.getElementById('stat-recent').textContent = years.length ? Math.max(...years) : '—';
-
+  updateSparkline(dois);
 }
 
 function syncFiltersToURL() {
@@ -1170,6 +1255,9 @@ function renderRow(d) {
   const updated = a.updated ? fmtDate(a.updated) : '';
   const pubYear  = a.publicationYear ?? '';
   const views = a.viewCount??0, cites = a.citationCount??0, dl = a.downloadCount??0;
+  const mv = a.metadataVersion ?? null;
+  const mvPct = mv !== null ? Math.round((mv / Math.max(1, maxVersion)) * 100) : 0;
+  const mvTip = 'metadataVersion: DataCite system counter incremented on each change. May include automated updates not shown in activity log.';
   return `
   <div class="doi-row" id="card-${sanitizeId(doi)}">
     <div class="doi-row-main">
@@ -1177,16 +1265,16 @@ function renderRow(d) {
         <div class="doi-title">${escHtml(title)}</div>
         <div class="doi-creators">${escHtml(creators)}</div>
         <div class="doi-meta-line">
-          ${typeG?`<span class="doi-badge badge-type">${escHtml(typeG)}</span>`:''}
-          ${typeS&&typeS!==typeG?`<span class="doi-badge badge-type" style="opacity:.7">${escHtml(typeS)}</span>`:''}
-          ${year?`<span class="doi-badge badge-year">${year}</span>`:''}
-          ${schema?`<span class="doi-badge badge-schema">${escHtml(schema)}</span>`:''}
+          ${typeG ? `<span class="doi-badge badge-type">${escHtml(typeG)}</span>` : ''}
+          ${typeS && typeS !== typeG ? `<span class="doi-badge badge-type" style="opacity:.7">${escHtml(typeS)}</span>` : ''}
+          ${year ? `<span class="doi-badge badge-year">${year}</span>` : ''}
+          ${schema ? `<span class="doi-badge badge-schema">${escHtml(schema)}</span>` : ''}
         </div>
         <div class="doi-identifier">
           <a href="https://doi.org/${doi}" target="_blank">${escHtml(doi)}</a>
-          ${pubYear?`<span style="margin-left:.8rem">published ${pubYear}</span>`:''}
-          ${updated?`<span style="margin-left:.8rem">updated ${updated}</span>`:''}
-          ${a.metadataVersion!=null?`<span style="margin-left:.8rem;font-family:var(--mono);color:var(--faint)">v${a.metadataVersion}</span>`:''}
+          ${pubYear ? `<span style="margin-left:.8rem">published ${pubYear}</span>` : ''}
+          ${updated ? `<span style="margin-left:.8rem">updated ${updated}</span>` : ''}
+          ${mv !== null ? `<span class="tip" style="margin-left:.8rem;font-family:var(--mono);color:var(--faint)" data-tip="${mvTip}">v${mv}</span><span class="version-bar-wrap"><span class="version-bar-track"><span class="version-bar-fill" style="width:${mvPct}%"></span></span></span>` : ''}
         </div>
         <div class="doi-counts">
           <span class="tip" data-tip="Views reported by repository to DataCite">${views} views</span><span class="tip" data-tip="Citations harvested from Crossref &amp; DataCite Event Data">${cites} citations</span><span class="tip" data-tip="Downloads reported by repository to DataCite">${dl} downloads</span>
@@ -1313,8 +1401,7 @@ function summariseValue(val) {
   if (val===null||val===undefined) return '—';
   if (typeof val==='string') return val;
   if (typeof val==='number'||typeof val==='boolean') return String(val);
-  if (Array.isArray(val)) { if(!val.length) return '(empty)'; return val.map(summariseValue).join(', '); }
-  if (typeof val==='object') return JSON.stringify(val, null, 0);
+  if (Array.isArray(val)||typeof val==='object') return JSON.stringify(val, null, 2);
   return String(val);
 }
 
@@ -1479,6 +1566,8 @@ async function loadRepository(clientId) {
   if (strip) strip.style.display = 'none';
   const lml=document.getElementById('list-meta'); if(lml) lml.textContent='Loading…';
   document.getElementById('stat-total').textContent = '—';
+  const sparkWrap = document.getElementById('rstat-spark'); if(sparkWrap) sparkWrap.style.display='none';
+  maxVersion = 1;
   document.getElementById('stat-types').textContent = '—';
   document.getElementById('stat-recent').textContent = '—';
   document.getElementById('brand-name').textContent = clientId;

@@ -1,12 +1,12 @@
 # Re-Curation Watch
 
-A tool by [Metadata Game Changers](https://metadatagamechangers.com) for browsing any DataCite repository and inspecting the full revision history or activity of each DOI.
+A tool by [Metadata Game Changers](https://metadatagamechangers.com) for browsing any DataCite repository and inspecting the latest full revision history or activity of each DOI.
 
 Live data is fetched directly from the [DataCite REST API](https://api.datacite.org) — no build step, no backend, no API key required. One HTML file, deploy anywhere.
 
 ## Features
 
-- **Any DataCite repository** — enter any client ID (e.g. `sjyq.oozvia`, `cern.zenodo`) to load its full DOI collection
+- **Any DataCite repository** — enter any client ID (e.g. `sjyq.oozvia`, `cern.zenodo`) to load its most recently updated 2000 DOIs or full collection
 - **Activity history** per DOI — fetched on demand from `/dois/{id}/activities`, showing a chronological timeline of every create, update, and publish event
 - **Before/after diff** for each change — field-level comparison showing what changed in each revision (URL, types, rights, related identifiers, dates, etc.)
 - **Revision pulse bar** — color-coded bar chart across the activity history, building left (oldest/green) to right (newest)

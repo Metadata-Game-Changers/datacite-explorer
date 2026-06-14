@@ -1,59 +1,97 @@
 # Re-Curation Watch
 
-A tool by [Metadata Game Changers](https://metadatagamechangers.com) for browsing any DataCite repository and inspecting the latest full revision history or activity of each DOI.
+A tool by [Metadata Game Changers](https://metadatagamechangers.com) for browsing any DataCite repository and inspecting the full curation history of each DOI — who changed what, when, and how.
 
 Live data is fetched directly from the [DataCite REST API](https://api.datacite.org) — no build step, no backend, no API key required. One HTML file, deploy anywhere.
 
-## Features
+## What it does
 
-- **Any DataCite repository** — enter any client ID (e.g. `sjyq.oozvia`, `cern.zenodo`) to load its most recently updated 2000 DOIs or full collection
-- **Activity history** per DOI — fetched on demand from `/dois/{id}/activities`, showing a chronological timeline of every create, update, and publish event
-- **Before/after diff** for each change — field-level comparison showing what changed in each revision (URL, types, rights, related identifiers, dates, etc.)
-- **Revision pulse bar** — color-coded bar chart across the activity history, building left (oldest/green) to right (newest)
-- Filter by title, creator, or DOI string
-- Filter by resource type and last updated year
-- Sort by last updated, publication year, or title
-- URL-based state — repository, search query, type, and year filters are all reflected in the URL for bookmarking and sharing
-- Live stats: total records, resource types, most recent year
+Re-Curation Watch surfaces the metadata provenance that DataCite records for every DOI since March 2019. For each update event you can see exactly which fields changed, with before and after values shown side by side. This makes it possible to assess the curation quality of any DataCite repository — not just what the metadata says now, but how it got there.
+
+## Finding a repository
+
+Type a repository name (e.g. "Zenodo", "Dryad", "Gump Station") or a DataCite client ID (e.g. `cern.zenodo`, `sjyq.oozvia`) into the search box in the purple hero bar. An autocomplete dropdown shows matching repositories with their DOI counts. Press Enter or click **Explore →** to load.
+
+The tool loads with the Metadata Game Changers repository by default.
+
+## Filters
+
+All filters are in the toolbar below the hero. They work together — applying one filter updates the available options in the others.
+
+**Search** — free-text search across titles, creator names, and DOI strings.
+
+**Type** — filter by DataCite resource type (Dataset, Software, Text, etc.). Options shown reflect what exists in the current filtered set.
+
+**Updated** — filter by the year the DOI record was last modified in DataCite. This is the year of the most recent curation activity, which may differ from the publication year.
+
+**Min. updates** — filter to DOIs with a minimum number of metadata versions. DataCite increments `metadataVersion` with each registered change, so this directly reflects curation activity:
+- `Any` — no filter, show all DOIs
+- `2+` — DOIs that have been updated at least once after initial registration
+- `5+` — DOIs with 5 or more registered metadata versions
+
+The dropdown only shows version counts that exist in the currently filtered set, so options reduce as you apply other filters. This prevents dead-end selections (e.g. you won't see `6+` for a type that has never had 6 updates).
+
+**Re-curated only** — checkbox that filters to DOIs where the `updated` timestamp is more than one day later than the `created` timestamp. This identifies records that received genuine post-registration curation, as opposed to DOIs where the only activity is the original creation event. Useful for finding evidence of active metadata maintenance in a repository.
+
+**Reset** — clears all filters and resets sort to Updated.
+
+## Sorting
+
+Three sort options in the toolbar: **Updated** (most recently modified first), **Published** (by `publicationYear`), and **Title** (alphabetical). Default is Updated, which surfaces the most recently curated records first.
+
+## Viewing curation history
+
+Click the **history** button on any DOI card to load its activity timeline. Each event shows:
+
+- Date and action type (create, update, publish) with color coding
+- A one-line summary of what changed ("Updated rights / licenses, related identifiers.")
+- **Show details ▸** — expands the full before/after field diff for that event
+
+At the top of the history panel, a **revision pulse bar** shows the full activity sequence left to right: the leftmost (shortest, green) bar is the creation event, and bars grow taller moving right toward the most recent activity. Color indicates action type: green = create, blue = update, amber = publish.
+
+## URL state
+
+Every filter choice, sort order, and page is reflected in the URL automatically, making any view bookmarkable and shareable:
+
+| Parameter | Description | Example |
+|---|---|---|
+| `client` | DataCite client ID | `?client=sjyq.oozvia` |
+| `q` | Search query | `&q=robinson` |
+| `type` | Resource type | `&type=Dataset` |
+| `year` | Updated year | `&year=2024` |
+| `version` | Min. metadata version | `&version=3` |
+| `recur` | Re-curated only | `&recur=1` |
+| `sort` | Sort order | `&sort=title` |
 
 ## Deploy to GitHub Pages
 
 1. Create or rename a repository to `recuration-watch`
-2. Add `index.html` and `README.md` to the root of `main`
+2. Add `index.html`, `README.md`, `LICENSE`, and `favicon_MGC.png` to the root of `main`
 3. Go to **Settings → Pages → Source**: select `main` branch, `/ (root)`
 4. Your site will be live at `https://[org].github.io/recuration-watch/`
 
 Works on any static host (Netlify, Cloudflare Pages, etc.) — no build process required.
 
-## URL parameters
-
-| Parameter | Description | Example |
-|---|---|---|
-| `client` | DataCite client ID to load | `?client=sjyq.oozvia` |
-| `q` | Search query | `&q=robinson` |
-| `type` | Resource type filter | `&type=Dataset` |
-| `year` | Publication year filter | `&year=2025` |
-
-All parameters update automatically as you interact with the tool, making any view shareable via URL.
-
 ## API endpoints used
 
 | Purpose | Endpoint |
 |---|---|
-| Client metadata | `GET /clients/{id}` |
-| All DOIs for client | `GET /dois?client-id={id}&page[size]=100` |
+| Repository search | `GET /clients?query={name}` |
+| Repository metadata | `GET /clients/{id}` |
+| All DOIs for repository | `GET /dois?client-id={id}&page[size]=100` |
 | DOI activity log | `GET /dois/{id}/activities` |
 
-Both DOI endpoints are public and CORS-enabled. The DataCite API paginates at 100 per page; the app fetches all pages automatically.
+All endpoints are public and CORS-enabled. The DOI endpoint paginates at 100 per page; the app fetches all pages automatically (capped at 2,000 records for performance).
 
 ## Customization
 
 - **Default repository**: change `DEFAULT_CLIENT` in the `<script>` block
-- **Page size**: change `PAGE_SIZE` (default 15 records per page)
-- **Colors**: all CSS custom properties are in the `:root` block
+- **Page size**: change `PAGE_SIZE` (default 50 records per page)
+- **Colors**: all CSS custom properties are in the `:root` block; the purple hero uses `#9167b0`
 
 ## Links
 
 - [Metadata Game Changers](https://metadatagamechangers.com)
 - [DataCite Commons](https://commons.datacite.org)
 - [DataCite REST API docs](https://support.datacite.org/docs/api)
+- [DataCite provenance documentation](https://support.datacite.org/docs/tracking-provenance)

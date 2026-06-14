@@ -422,13 +422,16 @@
     .pulse-bar {
       display: flex;
       align-items: flex-end;
-      gap: 3px;
-      height: 48px;
+      gap: 1px;
+      height: 32px;
       margin-bottom: 1.1rem;
+      width: 100%;
+      overflow: hidden;
     }
     .pulse-seg {
       flex: 1;
-      min-width: 4px;
+      min-width: 0;
+      max-width: 10px;
       opacity: 0.85;
     }
 
@@ -965,9 +968,18 @@ async function fetchAllDOIs() {
 
 async function fetchActivities(doiId) {
   try {
-    const res = await fetch(`${API_BASE}/dois/${encodeURIComponent(doiId)}/activities`);
-    if (!res.ok) throw new Error(`${res.status}`);
-    return (await res.json()).data ?? [];
+    let results = [], page = 1, total = null;
+    while (true) {
+      const res = await fetch(`${API_BASE}/dois/${encodeURIComponent(doiId)}/activities?page[size]=100&page[number]=${page}`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json();
+      if (total === null) total = json.meta?.total ?? 0;
+      results = results.concat(json.data ?? []);
+      if (results.length >= total || !(json.data?.length)) break;
+      page++;
+      if (page > 20) break; // safety cap at 2000 events
+    }
+    return results;
   } catch { return null; }
 }
 
@@ -1174,6 +1186,7 @@ async function toggleActivity(doiId) {
   panel.classList.add('open'); btn.classList.add('open'); btn.textContent='close';
   if (panel.dataset.loaded) return;
   panel.dataset.loaded='true';
+  panel.innerHTML = '<div style="padding:1rem 0;font-family:var(--mono);font-size:0.68rem;color:var(--faint);display:flex;align-items:center;gap:0.5rem;"><span class=\"load-spinner\"></span>Loading activities…</div>';
   const activities = await fetchActivities(doiId);
   renderActivities(panel, doiId, activities);
 }

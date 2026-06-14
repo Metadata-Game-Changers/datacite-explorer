@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="favicon_MGC.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --white:   #ffffff;
@@ -52,10 +52,10 @@
       gap: 0;
     }
     .topbar-brand {
-      padding: 0.5rem 2rem 0.5rem 0;
+      padding: 0.5rem 2rem 0.3rem 0;
       display: flex;
       flex-direction: row;
-      align-items: center;
+      align-items: flex-end;
       gap: 1rem;
     }
     .brand-logo {
@@ -64,14 +64,17 @@
       display: block;
       flex-shrink: 0;
     }
-    .brand-title-wrap { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 0.1rem; }
+    .brand-title-wrap { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 0.15rem; align-items: flex-start; }
     .brand-tool-name {
-      font-size: 1.25rem;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      color: var(--ink);
-      line-height: 1.2;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #673289;
+      line-height: 1;
       white-space: nowrap;
+      text-align: left;
+      text-transform: uppercase;
     }
     .brand-name {
       font-size: 0.95rem;

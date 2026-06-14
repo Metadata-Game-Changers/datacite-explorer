@@ -372,6 +372,7 @@
       font-variant-numeric: tabular-nums;
     }
     .doi-counts span { margin-right: 0.9rem; }
+    .doi-act-count { font-family:var(--mono); color:var(--blue); }
 
     .toggle-btn {
       font-size: 0.7rem;
@@ -841,6 +842,7 @@
     .tb-reset { font-size:0.7rem; font-family:var(--sans); background:none; border:1px solid var(--rule); color:var(--faint); padding:0.28rem 0.6rem; cursor:pointer; white-space:nowrap; }
     .tb-reset:hover { border-color:var(--red); color:var(--red); }
     .list-meta-inline { font-size: 0.72rem; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bg-fetch-progress { font-size: 0.68rem; color: var(--blue); font-family: var(--mono); white-space: nowrap; }
     .tb-check-wrap { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; white-space: nowrap; }
     .tb-check { cursor: pointer; accent-color: var(--ink); flex-shrink: 0; }
     .tb-check-label { font-size: 0.72rem; color: var(--sub); user-select: none; }
@@ -863,6 +865,7 @@
     <div class="topbar-links">
       <a href="https://github.com/Metadata-Game-Changers/recuration-watch/blob/main/README.md" target="_blank">ReadMe ↗</a>
       <a href="https://github.com/Metadata-Game-Changers/recuration-watch/issues/new/choose" target="_blank">Feedback ↗</a>
+      <button id="cite-btn" style="background:none;border:none;cursor:pointer;font-size:0.72rem;color:var(--sub);text-decoration:none;font-family:var(--sans);padding:0;text-align:left;">Cite this tool ↗</button>
       <a id="commons-link" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank" style="display:none"></a>
     </div>
   </div>
@@ -909,7 +912,7 @@
     <select class="tb-select" id="type-filter"><option value="">All types</option></select>
     <span class="tb-label">Updated</span>
     <select class="tb-select" id="year-filter"><option value="">All years</option></select>
-    <span class="tb-label">Min. updates</span>
+    <span class="tb-label">Min. events</span>
     <select class="tb-select" id="version-filter"><option value="0">Any</option></select>
   </div>
   <div class="toolbar-row toolbar-sort-row">
@@ -918,12 +921,18 @@
       <button class="sort-opt active" id="sort-updated">Updated</button>
       <button class="sort-opt" id="sort-year">Published</button>
       <button class="sort-opt" id="sort-title">Title</button>
+      <button class="sort-opt" id="sort-activities">Events</button>
     </div>
     <label class="tb-check-wrap" style="margin-left:0.5rem;">
       <input type="checkbox" id="recurated-only" class="tb-check" />
       <span class="tb-check-label">Re-curated only</span>
     </label>
+    <label class="tb-check-wrap">
+      <input type="checkbox" id="created-only" class="tb-check" />
+      <span class="tb-check-label">Created only</span>
+    </label>
     <button class="tb-reset" id="reset-filters" title="Reset all filters">✕ Reset</button>
+    <span class="bg-fetch-progress" id="bg-fetch-progress" style="display:none"></span>
     <div class="tb-spacer"></div>
     <span class="list-meta-inline" id="list-meta">Loading…</span>
   </div>
@@ -949,6 +958,9 @@ let expandedDOI = null;
 let loading     = false;
 let versionMin  = 0;
 let recuratedOnly = false;
+let createdOnly = false;
+let activityCounts = {}; // doi -> activity count, populated in background
+let bgFetchController = null; // AbortController for background fetch
 
 async function fetchAllDOIs() {
   let results = [], cursor = 1, total = null;
@@ -995,11 +1007,13 @@ function populateFilters(dois) {
 function populateVersionDropdown(baseDois) {
   const sel = document.getElementById('version-filter');
   if (!sel) return;
+  // Only show options for DOIs whose activity count is known
+  const known = baseDois.filter(d => activityCounts[d.id] !== undefined);
+  if (!known.length) return; // nothing fetched yet
   const prev = sel.value;
-  // Build sorted unique versions in this set
   const vCounts = {};
-  baseDois.forEach(d => {
-    const v = d.attributes?.metadataVersion ?? 1;
+  known.forEach(d => {
+    const v = activityCounts[d.id] ?? 0;
     for (let i = 1; i <= v; i++) vCounts[i] = (vCounts[i]||0) + 1;
   });
   const versions = Object.keys(vCounts).map(Number).sort((a,b)=>a-b).filter(v=>v>1);
@@ -1029,13 +1043,15 @@ function syncFiltersToURL() {
   const year    = document.getElementById('year-filter').value;
   const version = document.getElementById('version-filter')?.value || '0';
   const recur   = document.getElementById('recurated-only')?.checked ? '1' : '';
+  const created = document.getElementById('created-only')?.checked ? '1' : '';
   const sort    = sortKey;
   if (q)           url.searchParams.set('q', q);           else url.searchParams.delete('q');
   if (type)        url.searchParams.set('type', type);     else url.searchParams.delete('type');
   if (year)        url.searchParams.set('year', year);     else url.searchParams.delete('year');
   if (version!=='0') url.searchParams.set('version', version); else url.searchParams.delete('version');
   if (recur)       url.searchParams.set('recur', '1');     else url.searchParams.delete('recur');
-  if (sort && sort!=='updated') url.searchParams.set('sort', sort); else url.searchParams.delete('sort');
+  if (created)     url.searchParams.set('created', '1'); else url.searchParams.delete('created');
+  if (sort && sort!=='updated') url.searchParams.set('sort', sort); else url.searchParams.delete('sort'); // activities sort preserved
   if (currentPage > 1) url.searchParams.set('page', currentPage); else url.searchParams.delete('page');
   window.history.replaceState({}, '', url);
 }
@@ -1047,6 +1063,7 @@ function applyFiltersFromURL() {
   const year    = params.get('year') || '';
   const version = params.get('version') || '0';
   const recur   = params.get('recur') === '1';
+  const created = params.get('created') === '1';
   const sort    = params.get('sort') || 'updated';
   const page    = parseInt(params.get('page') || '1', 10);
   if (q)    document.getElementById('search-input').value = q;
@@ -1055,6 +1072,7 @@ function applyFiltersFromURL() {
   // version-filter options built after data loads — store for later
   window._urlVersion = version;
   const ro = document.getElementById('recurated-only'); if (ro) ro.checked = recur;
+  const co2 = document.getElementById('created-only'); if (co2) co2.checked = created;
   // restore sort
   if (sort !== 'updated') {
     sortKey = sort;
@@ -1070,6 +1088,7 @@ function applyFiltersAndRender() {
   const year = document.getElementById('year-filter').value;
   versionMin    = parseInt(document.getElementById('version-filter')?.value||'0',10)||0;
   recuratedOnly = document.getElementById('recurated-only')?.checked||false;
+  createdOnly   = document.getElementById('created-only')?.checked||false;
 
   // Base set (no version filter) for facet-aware dropdown
   const baseDois = allDOIs.filter(d => {
@@ -1077,11 +1096,18 @@ function applyFiltersAndRender() {
     const title = a.titles?.[0]?.title ?? '';
     const creators = (a.creators??[]).map(cr=>cr.name).join(' ');
     const doi = d.id ?? '';
-    const recur = a.created && a.updated && (new Date(a.updated)-new Date(a.created))>86400000;
+    const actCount = activityCounts[d.id];
+    const recur = actCount !== undefined
+      ? actCount > 1
+      : (a.created && a.updated && (new Date(a.updated)-new Date(a.created))>86400000);
+    const isCreatedOnly = actCount !== undefined
+      ? actCount <= 1
+      : !(a.created && a.updated && (new Date(a.updated)-new Date(a.created))>86400000);
     return (!q||[title,creators,doi].join(' ').toLowerCase().includes(q))
         && (!type||a.types?.resourceTypeGeneral===type)
         && (!year||(a.updated?String(new Date(a.updated).getFullYear())===year:false))
-        && (!recuratedOnly||recur);
+        && (!recuratedOnly||recur)
+        && (!createdOnly||isCreatedOnly);
   });
   populateVersionDropdown(baseDois);
   // Restore version from URL on first load
@@ -1099,18 +1125,20 @@ function applyFiltersAndRender() {
     const title = a.titles?.[0]?.title ?? '';
     const creators = (a.creators??[]).map(cr=>cr.name).join(' ');
     const doi = d.id ?? '';
-    const ver = a.metadataVersion ?? 1;
+    const ver = activityCounts[d.id] ?? null;
     const recur = a.created && a.updated && (new Date(a.updated)-new Date(a.created))>86400000;
     return (!q||[title,creators,doi].join(' ').toLowerCase().includes(q))
         && (!type||a.types?.resourceTypeGeneral===type)
         && (!year||(a.updated?String(new Date(a.updated).getFullYear())===year:false))
         && (!recuratedOnly||recur)
-        && (versionMin===0||ver>=versionMin);
+        && (!createdOnly||!recur)
+        && (versionMin===0||ver===null||ver>=versionMin);
   });
   filtered.sort((a,b)=>{
     if (sortKey==='updated') return new Date(b.attributes?.updated??0)-new Date(a.attributes?.updated??0);
     if (sortKey==='year')    return (b.attributes?.publicationYear??0)-(a.attributes?.publicationYear??0);
     if (sortKey==='title')   return (a.attributes?.titles?.[0]?.title??'').localeCompare(b.attributes?.titles?.[0]?.title??'');
+    if (sortKey==='activities') return (activityCounts[b.id]??-1)-(activityCounts[a.id]??-1);
     return 0;
   });
   renderPage();
@@ -1166,6 +1194,7 @@ function renderRow(d) {
         </div>
         <div class="doi-counts">
           <span>${views} views</span><span>${cites} citations</span><span>${dl} downloads</span>
+          <span class="doi-act-count" id="act-count-${sanitizeId(doi)}"></span>
         </div>
       </div>
       <button class="toggle-btn" data-doi="${escAttr(doi)}">history</button>
@@ -1367,11 +1396,11 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   sortKey = 'updated';
   document.querySelectorAll('.sort-opt').forEach(b=>b.classList.remove('active'));
   document.getElementById('sort-updated').classList.add('active');
-  versionMin=0; recuratedOnly=false; currentPage=1;
+  versionMin=0; recuratedOnly=false; activityCounts={}; currentPage=1;
   applyFiltersAndRender();
 });
 
-['sort-updated','sort-year','sort-title'].forEach(id=>{
+['sort-updated','sort-year','sort-title','sort-activities'].forEach(id=>{
   document.getElementById(id).addEventListener('click',()=>{
     document.querySelectorAll('.sort-opt').forEach(b=>b.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -1387,6 +1416,7 @@ document.getElementById('type-filter').addEventListener('change',()=>{if(loading
 document.getElementById('year-filter').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
 document.getElementById('version-filter').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
 document.getElementById('recurated-only').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
+document.getElementById('created-only').addEventListener('change',()=>{if(loading)return;currentPage=1;applyFiltersAndRender();});
 
 // ── Repo metadata lookup ─────────────────────────────
 async function fetchClientMeta(clientId) {
@@ -1429,7 +1459,8 @@ function resetFilters() {
   yf.innerHTML = '<option value="">All years</option>';
   const vf2 = document.getElementById('version-filter'); if(vf2){vf2.innerHTML='<option value="0">Any</option>';vf2.value='0';}
   const ro = document.getElementById('recurated-only'); if(ro) ro.checked=false;
-  versionMin=0; recuratedOnly=false;
+  const co = document.getElementById('created-only'); if(co) co.checked=false;
+  versionMin=0; recuratedOnly=false; createdOnly=false; activityCounts={};
   const url = new URL(window.location.href);
   url.searchParams.delete('q');
   url.searchParams.delete('type');
@@ -1480,6 +1511,9 @@ async function loadRepository(clientId) {
     stopLoadingTips();
     loading = false;
     applyFiltersAndRender();
+    // Start background activity count fetch
+    activityCounts = {};
+    startBackgroundActivityFetch(allDOIs);
   } catch(err) {
     document.getElementById('doi-container').innerHTML = `<div class="error-state">Failed to load: ${escHtml(err.message)}</div>`;
     stopLoadingTips();
@@ -1589,6 +1623,58 @@ document.getElementById('repo-go').addEventListener('click', () => {
 });
 
 
+// ── Background activity count fetcher ────────────────
+async function fetchActivityCount(doiId) {
+  try {
+    const res = await fetch(`${API_BASE}/dois/${encodeURIComponent(doiId)}/activities?page[size]=1`);
+    if (!res.ok) return 0;
+    const json = await res.json();
+    return json.meta?.total ?? (json.data?.length ?? 0);
+  } catch { return 0; }
+}
+
+async function startBackgroundActivityFetch(dois) {
+  // Cancel any in-progress fetch
+  if (bgFetchController) bgFetchController.abort();
+  bgFetchController = { cancelled: false };
+  const ctrl = bgFetchController;
+
+  const BATCH = 5; // concurrent requests
+  const progressEl = document.getElementById('bg-fetch-progress');
+  let done = 0;
+
+  for (let i = 0; i < dois.length; i += BATCH) {
+    if (ctrl.cancelled) break;
+    const batch = dois.slice(i, i + BATCH);
+    await Promise.all(batch.map(async d => {
+      if (ctrl.cancelled) return;
+      const count = await fetchActivityCount(d.id);
+      activityCounts[d.id] = count;
+      done++;
+
+      // Update badge on card if visible
+      const badge = document.getElementById('act-count-' + sanitizeId(d.id));
+      if (badge) badge.textContent = count + ' events';
+
+      // Update progress indicator
+      if (progressEl) {
+        progressEl.textContent = `Loading activity counts… ${done}/${dois.length}`;
+        progressEl.style.display = '';
+      }
+
+      // Refresh dropdown every 10 DOIs
+      if (done % 10 === 0 || done === dois.length) {
+        applyFiltersAndRender();
+      }
+    }));
+  }
+
+  if (!ctrl.cancelled) {
+    if (progressEl) progressEl.style.display = 'none';
+    applyFiltersAndRender(); // final refresh
+  }
+}
+
 // ── Re-Curation tips ─────────────────────────────────
 const RCW_TIPS = [
   { label: 'Re-Curation', text: '<strong>Re-curation</strong> means going back to published records to improve connectivity — adding ORCIDs, RORs, and related identifiers.', link: 'https://metadatagamechangers.com/blog' },
@@ -1628,6 +1714,19 @@ function renderInlineTip() {
 })();
 </script>
 
+<!-- CITATION POPOVER -->
+<div id="cite-popover" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:300;align-items:flex-start;justify-content:flex-end;padding:0.5rem 1rem 0 0;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--white);border:2px solid var(--ink);max-width:480px;width:100%;padding:1.5rem;position:relative;margin-top:3.5rem;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+    <div style="font-family:var(--mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--blue);margin-bottom:0.6rem;">Cite this tool</div>
+    <div id="cite-text" style="font-size:0.82rem;color:var(--ink);line-height:1.6;margin-bottom:1rem;">Loading citation…</div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <button id="cite-copy" style="font-size:0.72rem;font-family:var(--sans);background:var(--ink);color:var(--white);border:none;padding:0.35rem 0.8rem;cursor:pointer;">Copy citation</button>
+      <a href="https://doi.org/10.60872/recurationWatch" target="_blank" style="font-family:var(--mono);font-size:0.68rem;color:var(--blue);text-decoration:none;">doi.org/10.60872/recurationWatch ↗</a>
+      <button onclick="document.getElementById('cite-popover').style.display='none'" style="margin-left:auto;background:none;border:1px solid var(--rule);padding:0.28rem 0.6rem;cursor:pointer;font-size:0.7rem;color:var(--faint);">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- COOKIE BANNER -->
 <div class="cookie-banner" id="cookie-banner">
   <span>This site uses Google Analytics to understand how Re-Curation Watch is used. No personal data is collected beyond standard anonymized usage statistics. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy ↗</a></span>
@@ -1646,9 +1745,49 @@ function renderInlineTip() {
       </a>
       <span style="font-size:0.72rem;color:var(--faint);"><a href="https://github.com/Metadata-Game-Changers/recuration-watch" target="_blank" style="color:var(--sub);text-decoration:none;font-weight:500;">Re-Curation Watch</a> · Created by <a href="https://metadatagamechangers.com" target="_blank" style="color:var(--sub);text-decoration:none;font-weight:500;">Metadata Game Changers</a> · Better Documentation | Better Data | Better Science</span>
     </div>
-    <span style="font-family:var(--mono);font-size:0.65rem;color:var(--faint);"><a href="https://github.com/Metadata-Game-Changers/recuration-watch/issues/new/choose" target="_blank" style="color:var(--blue);text-decoration:none;font-family:var(--mono);font-size:0.65rem;">Report an issue ↗</a> &nbsp;·&nbsp; Live data from <a href="https://api.datacite.org" target="_blank" style="color:var(--blue);text-decoration:none;">api.datacite.org</a></span>
+    <span style="font-family:var(--mono);font-size:0.65rem;color:var(--faint);"><a href="https://github.com/Metadata-Game-Changers/recuration-watch/issues/new/choose" target="_blank" style="color:var(--blue);text-decoration:none;font-family:var(--mono);font-size:0.65rem;">Report an issue ↗</a> &nbsp;·&nbsp; <a href="https://doi.org/10.60872/recurationWatch" target="_blank" style="color:var(--sub);text-decoration:none;" title="Cite as: doi.org/10.60872/recurationWatch">DOI: 10.60872/recurationWatch</a> &nbsp;·&nbsp; <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener" style="color:var(--sub);text-decoration:none;">CC BY-NC 4.0</a> &nbsp;·&nbsp; Live data from <a href="https://api.datacite.org" target="_blank" style="color:var(--blue);text-decoration:none;">api.datacite.org</a></span>
   </div>
 </footer>
+
+<script>
+// ── Citation popover ──────────────────────────────────
+const CITE_DOI = '10.60872/recurationWatch';
+
+async function loadCitation() {
+  const el = document.getElementById('cite-text');
+  try {
+    // Fetch citation in APA format via DataCite content negotiation
+    const res = await fetch(`https://doi.org/${CITE_DOI}`, {
+      headers: { 'Accept': 'text/x-bibliography; style=apa' }
+    });
+    if (!res.ok) throw new Error();
+    const text = await res.text();
+    el.textContent = text.trim();
+  } catch {
+    // Fallback: build citation from what we know
+    el.textContent = 'Robinson, E. (2026). Re-Curation Watch (v1.0). Metadata Game Changers LLC. https://doi.org/' + CITE_DOI;
+  }
+}
+
+let citationLoaded = false;
+document.getElementById('cite-btn').addEventListener('click', () => {
+  const popover = document.getElementById('cite-popover');
+  popover.style.display = 'flex';
+  if (!citationLoaded) {
+    citationLoaded = true;
+    loadCitation();
+  }
+});
+
+document.getElementById('cite-copy').addEventListener('click', () => {
+  const text = document.getElementById('cite-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('cite-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy citation', 2000);
+  });
+});
+</script>
 
 <script>
 (function() {
@@ -1678,6 +1817,19 @@ function renderInlineTip() {
   gtag('config', 'G-9JQRWY72HW');
 </script>
 
+<!-- CITATION POPOVER -->
+<div id="cite-popover" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:300;align-items:flex-start;justify-content:flex-end;padding:0.5rem 1rem 0 0;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--white);border:2px solid var(--ink);max-width:480px;width:100%;padding:1.5rem;position:relative;margin-top:3.5rem;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+    <div style="font-family:var(--mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--blue);margin-bottom:0.6rem;">Cite this tool</div>
+    <div id="cite-text" style="font-size:0.82rem;color:var(--ink);line-height:1.6;margin-bottom:1rem;">Loading citation…</div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <button id="cite-copy" style="font-size:0.72rem;font-family:var(--sans);background:var(--ink);color:var(--white);border:none;padding:0.35rem 0.8rem;cursor:pointer;">Copy citation</button>
+      <a href="https://doi.org/10.60872/recurationWatch" target="_blank" style="font-family:var(--mono);font-size:0.68rem;color:var(--blue);text-decoration:none;">doi.org/10.60872/recurationWatch ↗</a>
+      <button onclick="document.getElementById('cite-popover').style.display='none'" style="margin-left:auto;background:none;border:1px solid var(--rule);padding:0.28rem 0.6rem;cursor:pointer;font-size:0.7rem;color:var(--faint);">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- COOKIE BANNER -->
 <div class="cookie-banner" id="cookie-banner">
   <span>This site uses Google Analytics to understand how Re-Curation Watch is used. No personal data is collected beyond standard anonymized usage statistics. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy ↗</a></span>
@@ -1686,6 +1838,46 @@ function renderInlineTip() {
     <button class="cookie-btn cookie-btn-decline" id="cookie-decline">Decline</button>
   </div>
 </div>
+
+<script>
+// ── Citation popover ──────────────────────────────────
+const CITE_DOI = '10.60872/recurationWatch';
+
+async function loadCitation() {
+  const el = document.getElementById('cite-text');
+  try {
+    // Fetch citation in APA format via DataCite content negotiation
+    const res = await fetch(`https://doi.org/${CITE_DOI}`, {
+      headers: { 'Accept': 'text/x-bibliography; style=apa' }
+    });
+    if (!res.ok) throw new Error();
+    const text = await res.text();
+    el.textContent = text.trim();
+  } catch {
+    // Fallback: build citation from what we know
+    el.textContent = 'Robinson, E. (2026). Re-Curation Watch (v1.0). Metadata Game Changers LLC. https://doi.org/' + CITE_DOI;
+  }
+}
+
+let citationLoaded = false;
+document.getElementById('cite-btn').addEventListener('click', () => {
+  const popover = document.getElementById('cite-popover');
+  popover.style.display = 'flex';
+  if (!citationLoaded) {
+    citationLoaded = true;
+    loadCitation();
+  }
+});
+
+document.getElementById('cite-copy').addEventListener('click', () => {
+  const text = document.getElementById('cite-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('cite-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy citation', 2000);
+  });
+});
+</script>
 
 <script>
 (function() {

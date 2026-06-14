@@ -1037,16 +1037,18 @@ async function fetchAllDOIs() {
 
 async function fetchActivities(doiId) {
   try {
-    let results = [], page = 1, total = null;
+    let results = [], total = null, page = 1;
     while (true) {
-      const res = await fetch(`${API_BASE}/dois/${encodeURIComponent(doiId)}/activities?page[size]=100&page[number]=${page}`);
+      const url = `${API_BASE}/dois/${encodeURIComponent(doiId)}/activities?page[size]=100&page[number]=${page}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status}`);
       const json = await res.json();
       if (total === null) total = json.meta?.total ?? 0;
-      results = results.concat(json.data ?? []);
-      if (results.length >= total || !(json.data?.length)) break;
+      const batch = json.data ?? [];
+      results = results.concat(batch);
+      if (!batch.length || results.length >= total) break;
       page++;
-      if (page > 20) break; // safety cap at 2000 events
+      if (page > 50) break;
     }
     return results;
   } catch { return null; }
@@ -1247,7 +1249,7 @@ function renderRow(d) {
   const a  = d.attributes ?? {};
   const doi = d.id ?? '';
   const title    = a.titles?.[0]?.title ?? '(Untitled)';
-  const creators = (a.creators??[]).map(c=>c.name).join(', ') || '—';
+  const creators = (a.creators??[]).map(c => (c.name || [c.givenName, c.familyName].filter(Boolean).join(' ') || c.nameIdentifiers?.[0]?.nameIdentifier || '').trim()).filter(Boolean).join(', ') || '—';
   const year   = a.publicationYear ?? '';
   const typeG  = a.types?.resourceTypeGeneral ?? '';
   const typeS  = a.types?.resourceType ?? '';

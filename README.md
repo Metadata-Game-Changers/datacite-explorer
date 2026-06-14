@@ -12,6 +12,7 @@ Re-Curation Watch surfaces the metadata provenance that DataCite records for eve
 
 Note: Re-Curation Watch queries the DataCite Public REST API, which is freely accessible without authentication. DOI metadata displayed is provided by DataCite member repositories and carries the licenses assigned by those repositories. DataCite's own documentation is licensed CC-BY 4.0.
 
+
 ## Finding a repository
 
 Type a repository name (e.g. "Zenodo", "Dryad", "Gump Station") or a DataCite client ID (e.g. `cern.zenodo`, `sjyq.oozvia`) into the search box in the purple hero bar. An autocomplete dropdown shows matching repositories with their DOI counts. Press Enter or click **Explore →** to load.
@@ -28,12 +29,9 @@ All filters are in the toolbar below the hero. They work together — applying o
 
 **Updated** — filter by the year the DOI record was last modified in DataCite. This is the year of the most recent curation activity, which may differ from the publication year.
 
-**Min. updates** — filter to DOIs with a minimum number of metadata versions. DataCite increments `metadataVersion` with each registered change, so this directly reflects curation activity:
-- `Any` — no filter, show all DOIs
-- `2+` — DOIs that have been updated at least once after initial registration
-- `5+` — DOIs with 5 or more registered metadata versions
+**Min. versions** — filter to DOIs with a minimum `metadataVersion` value. DataCite increments this counter each time a DOI record is touched in their system, including automated changes, so it is a proxy for curation activity rather than an exact count of deliberate updates. The dropdown shows only the distinct version values that actually exist in the currently filtered set, with a count of how many DOIs have at least that many versions — so options reduce as you apply other filters and you can never select a value with zero results.
 
-The dropdown only shows version counts that exist in the currently filtered set, so options reduce as you apply other filters. This prevents dead-end selections (e.g. you won't see `6+` for a type that has never had 6 updates).
+Note: `metadataVersion` can be higher than the number of entries in the activity log, since not all system changes generate a provenance record. Open the history panel on any DOI to see the exact count of recorded activity events.
 
 **Re-curated only** — checkbox that filters to DOIs where the `updated` timestamp is more than one day later than the `created` timestamp. This identifies records that received genuine post-registration curation, as opposed to DOIs where the only activity is the original creation event. Useful for finding evidence of active metadata maintenance in a repository.
 

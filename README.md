@@ -1,3 +1,4 @@
+# If you have feedback or find a bug please let us know through [Github issues](https://github.com/Metadata-Game-Changers/recuration-watch/issues/new/choose)! 
 # Re-Curation Watch
 [![DOI](https://img.shields.io/badge/DOI-10.60872%2FrecurationWatch-blue)](https://doi.org/10.60872/recurationWatch)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)

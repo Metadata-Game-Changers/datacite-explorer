@@ -14,9 +14,13 @@ Re-Curation Watch surfaces the metadata provenance that DataCite records for eve
 Note: Re-Curation Watch queries the DataCite Public REST API, which is freely accessible without authentication. DOI metadata displayed is provided by DataCite member repositories and carries the licenses assigned by those repositories. DataCite's own documentation is licensed CC-BY 4.0.
 
 
-## Finding a repository
+## Finding a repository, DOI, or prefix
 
 Type a repository name (e.g. "Zenodo", "Dryad", "Gump Station") or a DataCite client ID (e.g. `cern.zenodo`, `sjyq.oozvia`) into the search box in the purple hero bar. An autocomplete dropdown shows matching repositories with their DOI counts. Press Enter or click **Explore →** to load.
+
+Type a prefix in and the most recently updated 2000 records for a specific prefix will load. 
+
+Type in a specific DOI and the history for that DOI will load. 
 
 The tool loads with the Metadata Game Changers repository by default.
 

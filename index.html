@@ -959,7 +959,7 @@
     </div>
     <div class="hero-search">
       <div class="hero-form">
-        <input class="repo-input hero-input" id="repo-input" type="text" placeholder="Repository name, client ID, or DOI…" spellcheck="false" autocomplete="off" />
+        <input class="repo-input hero-input" id="repo-input" type="text" placeholder="Repository, client ID, DOI, or prefix (e.g. 10.58052)…" spellcheck="false" autocomplete="off" />
         <button class="repo-go hero-go" id="repo-go">Explore →</button>
       </div>
       <div class="repo-autocomplete" id="repo-autocomplete"></div>
@@ -1281,7 +1281,7 @@ function renderRow(d) {
   <div class="doi-row" id="card-${sanitizeId(doi)}">
     <div class="doi-row-main">
       <div>
-        <div class="doi-title">${escHtml(title)}</div>
+        <div class="doi-title"><a href="https://commons.datacite.org/doi.org/${doi}" target="_blank" style="color:inherit;text-decoration:none;">${escHtml(title)}</a></div>
         <div class="doi-creators">${escHtml(creators)}</div>
         <div class="doi-meta-line">
           ${typeG ? `<span class="doi-badge badge-type">${escHtml(typeG)}</span>` : ''}
@@ -1293,6 +1293,7 @@ function renderRow(d) {
           <a href="https://doi.org/${doi}" target="_blank">${escHtml(doi)}</a>
           ${pubYear ? `<span style="margin-left:.8rem">published ${pubYear}</span>` : ''}
           ${updated ? `<span style="margin-left:.8rem">updated ${updated}</span>` : ''}
+          <a href="https://api.datacite.org/application/vnd.datacite.datacite+json/${doi}" target="_blank" style="margin-left:.8rem;font-family:var(--mono);font-size:0.65rem;color:var(--blue);text-decoration:none;">JSON metadata ↗</a>
           ${mv !== null ? `<span class="tip" style="margin-left:.8rem;font-family:var(--mono);color:var(--faint)" data-tip="${mvTip}">v${mv}</span><span class="version-bar-wrap"><span class="version-bar-track"><span class="version-bar-fill" style="width:${mvPct}%"></span></span></span>` : ''}
         </div>
         <div class="doi-counts">
@@ -1697,7 +1698,7 @@ function closeAutocomplete() {
 document.getElementById('repo-input').addEventListener('input', () => {
   const q = document.getElementById('repo-input').value.trim();
   clearTimeout(acTimer);
-  if (q.length < 2 || isDOI(q)) { closeAutocomplete(); return; }
+  if (q.length < 2 || isDOI(q) || isPrefix(q)) { closeAutocomplete(); return; }
   document.getElementById('repo-autocomplete').innerHTML = '<div class="repo-ac-loading">Searching…</div>';
   document.getElementById('repo-autocomplete').classList.add('open');
   acTimer = setTimeout(async () => {
@@ -1733,6 +1734,7 @@ document.getElementById('repo-input').addEventListener('keydown', e => {
       closeAutocomplete();
       if (!val) return;
       if (isDOI(val)) loadSingleDOI(val);
+      else if (isPrefix(val)) loadPrefixDOIs(val);
       else loadRepository(val);
     }
   } else if (e.key === 'Escape') {
@@ -1746,13 +1748,80 @@ document.addEventListener('click', e => {
 
 // ── Repo switcher events ──────────────────────────────
 function isDOI(val) {
-  // Matches doi.org URLs or bare DOIs starting with 10.
-  return /^(https?:\/\/doi\.org\/)?10\.\d{4,}\/\S+$/i.test(val.trim());
+  // Matches doi.org URLs or bare DOIs starting with 10. with a slash and suffix
+  return /^(https?:\/\/doi\.org\/)?10\.\d{4,}\/.+$/i.test(val.trim());
+}
+
+function isPrefix(val) {
+  // Matches bare prefix like 10.58052 or 10.58052/ — has 10. but no content after slash
+  return /^10\.\d{4,}\/?$/.test(val.trim());
 }
 
 function parseDOI(val) {
   // Strip doi.org prefix if present
   return val.trim().replace(/^https?:\/\/doi\.org\//i, '');
+}
+
+async function loadPrefixDOIs(prefix) {
+  prefix = prefix.trim().replace(/\/$/, ''); // strip trailing slash
+  document.getElementById('repo-input').value = prefix;
+  document.getElementById('repo-error').classList.remove('show');
+  document.getElementById('doi-container').innerHTML = '<div class="loading-state" id="loading-tip-container"></div>';
+  setTimeout(startLoadingTips, 2000);
+  const lm = document.getElementById('list-meta'); if(lm) lm.textContent = 'Loading…';
+
+  try {
+    let results = [], cursor = 1, total = null;
+    while (true) {
+      const url = `${API_BASE}/dois?query=doi:${encodeURIComponent(prefix)}*&page[size]=100&page[number]=${cursor}&sort=-updated`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+      if (total === null) total = json.meta?.total ?? 0;
+      results = results.concat(json.data ?? []);
+      if (results.length >= total || !(json.data?.length) || results.length >= 2000) break;
+      cursor++;
+      if (cursor > 20) break;
+    }
+
+    stopLoadingTips();
+    allDOIs = results;
+    filtered = results;
+
+    // Update branding
+    const strip = document.getElementById('repo-stats-strip');
+    const stripName = document.getElementById('repo-stats-name');
+    if (strip) strip.style.display = '';
+    if (stripName) stripName.textContent = `Prefix ${prefix}`;
+    document.title = `Re-Curation Watch · ${prefix}`;
+    document.getElementById('brand-name').textContent = prefix;
+
+    // Update commons link
+    const cl = document.getElementById('commons-link');
+    const cl2 = document.getElementById('commons-link-repo');
+    const prefixUrl = `https://commons.datacite.org/doi.org?query=doi:${prefix}*`;
+    if (cl) cl.href = prefixUrl;
+    if (cl2) { cl2.href = prefixUrl; cl2.textContent = `Prefix ${prefix}`; }
+
+    // Update URL
+    const url2 = new URL(window.location.href);
+    url2.searchParams.set('prefix', prefix);
+    url2.searchParams.delete('client');
+    url2.searchParams.delete('doi');
+    try { window.history.replaceState({}, '', url2); } catch(e) {}
+
+    updateStats(allDOIs);
+    populateFilters(allDOIs);
+    resetFilters();
+    applyFiltersFromURL();
+    currentPage = 1;
+    applyFiltersAndRender();
+
+  } catch(err) {
+    stopLoadingTips();
+    document.getElementById('doi-container').innerHTML = `<div class="error-state">Could not load prefix: ${escHtml(err.message)}</div>`;
+    const lme = document.getElementById('list-meta'); if(lme) lme.textContent = 'Error';
+  }
 }
 
 async function loadSingleDOI(doiId) {
@@ -1815,6 +1884,7 @@ document.getElementById('repo-go').addEventListener('click', () => {
   closeAutocomplete();
   if (!val) return;
   if (isDOI(val)) loadSingleDOI(val);
+  else if (isPrefix(val)) loadPrefixDOIs(val);
   else loadRepository(val);
 });
 
@@ -1855,10 +1925,13 @@ function renderInlineTip() {
 // ── Boot: check URL param, else load default ──────────
 (async () => {
   const params = new URLSearchParams(window.location.search);
-  const doiParam = params.get('doi');
+  const doiParam    = params.get('doi');
+  const prefixParam = params.get('prefix');
   const clientFromUrl = params.get('client');
   if (doiParam) {
     await loadSingleDOI(doiParam);
+  } else if (prefixParam) {
+    await loadPrefixDOIs(prefixParam);
   } else {
     await loadRepository(clientFromUrl || DEFAULT_CLIENT);
   }

@@ -1354,7 +1354,7 @@ function renderRow(d) {
   const a  = d.attributes ?? {};
   const doi = d.id ?? '';
   const title    = a.titles?.[0]?.title ?? '(Untitled)';
-  const creators = (a.creators??[]).map(c => (c.name || [c.givenName, c.familyName].filter(Boolean).join(' ') || c.nameIdentifiers?.[0]?.nameIdentifier || '').trim()).filter(Boolean).join(', ') || '—';
+  const creators = (a.creators??[]).map(c => (c.name || [c.givenName, c.familyName].filter(Boolean).join(' ') || c.nameIdentifiers?.[0]?.nameIdentifier || '').trim()).filter(Boolean).join('; ') || '—';
   const year   = a.publicationYear ?? '';
   const typeG  = a.types?.resourceTypeGeneral ?? '';
   const typeS  = a.types?.resourceType ?? '';

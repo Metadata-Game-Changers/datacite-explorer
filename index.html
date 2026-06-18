@@ -182,6 +182,45 @@
     .hero-hint { font-size: 0.7rem; color: var(--faint); }
     .hero-hint a { color: var(--blue); text-decoration: none; }
     .hero-hint a:hover { text-decoration: underline; }
+    .hero-secondary {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .hero-select {
+      border: 1px solid rgba(145,103,176,0.4);
+      background: rgba(255,255,255,0.85);
+      padding: 0.32rem 0.6rem;
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      color: var(--ink);
+      outline: none;
+      cursor: pointer;
+      flex: 1;
+    }
+    .hero-select:focus { border-color: #9167b0; }
+    .hero-query-input {
+      border: 1px solid rgba(145,103,176,0.4);
+      background: rgba(255,255,255,0.85);
+      padding: 0.32rem 0.6rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink);
+      outline: none;
+      flex: 2;
+      min-width: 0;
+    }
+    .hero-query-input:focus { border-color: #9167b0; }
+    .hero-query-input::placeholder { color: var(--faint); }
+    .hero-secondary-label {
+      font-size: 0.65rem;
+      color: rgba(103,50,137,0.7);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
 
     /* ── Repo stats strip ───────────────────────── */
     .repo-stats-strip {
@@ -954,8 +993,8 @@
 <div class="hero" id="hero">
   <div class="hero-inner">
     <div class="hero-text">
-      <h2 class="hero-title">Explore any DataCite Repository, Prefix or DOI</h2>
-      <p class="hero-sub">Search by repository name or enter a DataCite client ID to browse its most recently updated DOIs, or enter a specific prefix to show 2000 DOIs or a DataCite DOI to show a single curation history.</p>
+      <h2 class="hero-title">Explore any DataCite Repository or DOI</h2>
+      <p class="hero-sub">Search by repository name or enter a DataCite client ID to browse its most recently updated DOIs, or enter a specific DataCite DOI to show a single curation history.</p>
     </div>
     <div class="hero-search">
       <div class="hero-form">
@@ -963,6 +1002,45 @@
         <button class="repo-go hero-go" id="repo-go">Explore →</button>
       </div>
       <div class="repo-autocomplete" id="repo-autocomplete"></div>
+      <div class="hero-secondary">
+        <span class="hero-secondary-label">Type</span>
+        <select class="hero-select" id="hero-resource-type">
+          <option value="">All resource types</option>
+          <option value="audiovisual">Audiovisual</option>
+          <option value="book">Book</option>
+          <option value="book-chapter">Book Chapter</option>
+          <option value="collection">Collection</option>
+          <option value="computational-notebook">Computational Notebook</option>
+          <option value="conference-paper">Conference Paper</option>
+          <option value="conference-proceeding">Conference Proceeding</option>
+          <option value="data-paper">Data Paper</option>
+          <option value="dataset">Dataset</option>
+          <option value="dissertation">Dissertation</option>
+          <option value="event">Event</option>
+          <option value="image">Image</option>
+          <option value="instrument">Instrument</option>
+          <option value="interactive-resource">Interactive Resource</option>
+          <option value="journal">Journal</option>
+          <option value="journal-article">Journal Article</option>
+          <option value="model">Model</option>
+          <option value="other">Other</option>
+          <option value="output-management-plan">Output Management Plan</option>
+          <option value="peer-review">Peer Review</option>
+          <option value="physical-object">Physical Object</option>
+          <option value="preprint">Preprint</option>
+          <option value="project">Project</option>
+          <option value="report">Report</option>
+          <option value="service">Service</option>
+          <option value="software">Software</option>
+          <option value="sound">Sound</option>
+          <option value="standard">Standard</option>
+          <option value="study-registration">Study Registration</option>
+          <option value="text">Text</option>
+          <option value="workflow">Workflow</option>
+        </select>
+        <span class="hero-secondary-label">Query</span>
+        <input class="hero-query-input" id="hero-query" type="text" placeholder="e.g. publicationYear:2024" spellcheck="false" autocomplete="off" />
+      </div>
       <div class="hero-hints">
         <span class="repo-error" id="repo-error">Repository not found</span>
         <span class="hero-hint">Currently viewing: <a id="commons-link-repo" href="https://commons.datacite.org/repositories/sjyq.oozvia" target="_blank" id="current-repo-name">Metadata Game Changers</a></span>
@@ -1036,10 +1114,12 @@ let versionMin  = 0;
 let maxVersion  = 1;
 let recuratedOnly = false;
 let createdOnly = false;
-async function fetchAllDOIs() {
+async function fetchAllDOIs(resourceTypeId='', extraQuery='') {
   let results = [], cursor = 1, total = null;
   while (true) {
-    const url = `${API_BASE}/dois?client-id=${encodeURIComponent(CLIENT_ID)}&page[size]=100&page[number]=${cursor}&sort=-updated`;
+    let url = `${API_BASE}/dois?client-id=${encodeURIComponent(CLIENT_ID)}&page[size]=100&page[number]=${cursor}&sort=-updated`;
+    if (resourceTypeId) url += `&resource-type-id=${encodeURIComponent(resourceTypeId)}`;
+    if (extraQuery) url += `&query=${encodeURIComponent(extraQuery)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const json = await res.json();
@@ -1147,6 +1227,8 @@ function syncFiltersToURL() {
   const year    = document.getElementById('year-filter').value;
   const version = document.getElementById('version-filter')?.value || '0';
   const recur   = document.getElementById('recurated-only')?.checked ? '1' : '';
+  const heroRt  = document.getElementById('hero-resource-type')?.value || '';
+  const heroQ   = document.getElementById('hero-query')?.value.trim() || '';
   const created = document.getElementById('created-only')?.checked ? '1' : '';
   const sort    = sortKey;
   if (q)           url.searchParams.set('q', q);           else url.searchParams.delete('q');
@@ -1154,6 +1236,8 @@ function syncFiltersToURL() {
   if (year)        url.searchParams.set('year', year);     else url.searchParams.delete('year');
   if (version!=='0') url.searchParams.set('version', version); else url.searchParams.delete('version');
   if (recur)       url.searchParams.set('recur', '1');     else url.searchParams.delete('recur');
+  if (heroRt)      url.searchParams.set('resourceType', heroRt); else url.searchParams.delete('resourceType');
+  if (heroQ)       url.searchParams.set('q2', heroQ);           else url.searchParams.delete('q2');
   if (created)     url.searchParams.set('created', '1'); else url.searchParams.delete('created');
   if (sort && sort!=='updated') url.searchParams.set('sort', sort); else url.searchParams.delete('sort'); // version sort preserved // activities sort preserved
   if (currentPage > 1) url.searchParams.set('page', currentPage); else url.searchParams.delete('page');
@@ -1167,6 +1251,10 @@ function applyFiltersFromURL() {
   const year    = params.get('year') || '';
   const version = params.get('version') || '0';
   const recur   = params.get('recur') === '1';
+  const heroRtUrl = params.get('resourceType') || '';
+  const heroQUrl  = params.get('q2') || '';
+  const heroRtEl = document.getElementById('hero-resource-type'); if(heroRtEl && heroRtUrl) heroRtEl.value = heroRtUrl;
+  const heroQEl  = document.getElementById('hero-query'); if(heroQEl && heroQUrl) heroQEl.value = heroQUrl;
   const created = params.get('created') === '1';
   const sort    = params.get('sort') || 'updated';
   const page    = parseInt(params.get('page') || '1', 10);
@@ -1529,6 +1617,14 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   applyFiltersAndRender();
 });
 
+document.getElementById('hero-resource-type').addEventListener('change', () => {
+  const val = document.getElementById('repo-input').value.trim();
+  if (val && !isDOI(val)) {
+    if (isPrefix(val)) loadPrefixDOIs(val);
+    else loadRepository(val);
+  }
+});
+
 ['sort-updated','sort-year','sort-title','sort-version'].forEach(id=>{
   document.getElementById(id).addEventListener('click',()=>{
     document.querySelectorAll('.sort-opt').forEach(b=>b.classList.remove('active'));
@@ -1623,7 +1719,9 @@ async function loadRepository(clientId) {
 
   try {
     // Fetch client meta + DOIs in parallel
-    const [meta, dois] = await Promise.all([fetchClientMeta(clientId), fetchAllDOIs()]);
+    const heroResourceType = document.getElementById('hero-resource-type')?.value || '';
+    const heroQuery = document.getElementById('hero-query')?.value.trim() || '';
+    const [meta, dois] = await Promise.all([fetchClientMeta(clientId), fetchAllDOIs(heroResourceType, heroQuery)]);
     if (!dois.length && !meta) {
       document.getElementById('repo-error').textContent = 'client not found';
       document.getElementById('repo-error').classList.add('show');
@@ -1773,7 +1871,11 @@ async function loadPrefixDOIs(prefix) {
   try {
     let results = [], cursor = 1, total = null;
     while (true) {
-      const url = `${API_BASE}/dois?query=doi:${encodeURIComponent(prefix)}*&page[size]=100&page[number]=${cursor}&sort=-updated`;
+      const heroResourceType2 = document.getElementById('hero-resource-type')?.value || '';
+      const heroQuery2 = document.getElementById('hero-query')?.value.trim() || '';
+      let url = `${API_BASE}/dois?query=doi:${encodeURIComponent(prefix)}*&page[size]=100&page[number]=${cursor}&sort=-updated`;
+      if (heroResourceType2) url += `&resource-type-id=${encodeURIComponent(heroResourceType2)}`;
+      if (heroQuery2) url += `&query=${encodeURIComponent('doi:'+prefix+'* AND '+heroQuery2)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const json = await res.json();

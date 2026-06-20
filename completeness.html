@@ -80,7 +80,12 @@
   button.run{font:inherit;font-weight:600;font-size:.9rem;background:var(--accent);color:#fff;border:0;border-radius:7px;padding:.55rem 1.1rem;cursor:pointer}
   button.run:disabled{opacity:.5;cursor:default}
   label.chk{display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--muted);cursor:pointer}
-  #status{font-size:.82rem;color:var(--muted);min-height:1.2em;margin:.2rem 0 1rem}
+  #status{font-size:.82rem;color:var(--muted);min-height:1.2em;margin:.2rem 0 .5rem}
+  #progress{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin:0 0 1rem;display:none}
+  #progress.on{display:block}
+  #progress>i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .18s ease}
+  #progress.indet>i{width:40%;animation:indet 1.1s ease-in-out infinite}
+  @keyframes indet{0%{margin-left:-40%}100%{margin-left:100%}}
   #apiurl{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.7rem;color:var(--muted);background:#f3f1f8;border-radius:6px;padding:.45rem .6rem;margin:0 0 1rem;word-break:break-all;line-height:1.5}
   #apiurl b{color:var(--ink);font-weight:600}
   #status.err{color:#b4322f}
@@ -169,6 +174,7 @@
 
 <div class="wrap">
   <div id="status">Loading jq engine…</div>
+  <div id="progress"><i></i></div>
   <div id="apiurl" style="display:none"></div>
 
   <div class="card total-card" id="total-card" style="display:none">
@@ -233,6 +239,11 @@ const $ = id => document.getElementById(id);
 const statusEl = $('status');
 function setStatus(msg, isErr){ statusEl.textContent = msg; statusEl.className = isErr ? 'err' : ''; }
 
+/* progress bar: determinate setProgress(0..1) · setProgressIndeterminate() · hideProgress() */
+function setProgress(frac){ const p=$('progress'); p.classList.add('on'); p.classList.remove('indet'); p.firstElementChild.style.width = Math.max(0,Math.min(1,frac))*100 + '%'; }
+function setProgressIndeterminate(){ const p=$('progress'); p.classList.add('on','indet'); p.firstElementChild.style.width=''; }
+function hideProgress(){ const p=$('progress'); p.classList.remove('on','indet'); p.firstElementChild.style.width='0'; }
+
 /* ---------- jq readiness ---------- */
 let jqReady = false;
 function whenJqReady(){
@@ -267,6 +278,8 @@ async function fetchRepo(clientId, cap, random){
   const seen = new Set();                         // dedup by DOI id across requests
   const pageSize = Math.min(1000, cap);           // DataCite max page[size] is 1000
   let page = 1, requests = 0, firstUrl = '', repoTotal = null;
+  setStatus('Fetching records…');
+  if (random) setProgressIndeterminate(); else setProgress(0);
   while (records.length < cap) {
     requests++;
     const base = `${API_BASE}/dois?client-id=${encodeURIComponent(clientId)}&page[size]=${pageSize}&affiliation=true&publisher=true`;
@@ -275,7 +288,6 @@ async function fetchRepo(clientId, cap, random){
       ? `${base}&random=true&disable-facets=true`
       : `${base}&page[number]=${page}&sort=-updated`;
     if (!firstUrl) firstUrl = url;
-    setStatus(`Fetching records… (${records.length} unique so far)`);
     let res;
     try {
       res = await fetch(url);
@@ -290,6 +302,7 @@ async function fetchRepo(clientId, cap, random){
     const batch = json.data || [];
     let added = 0;
     for (const r of batch){ if (!seen.has(r.id)){ seen.add(r.id); records.push(r); added++; } }
+    if (!random) setProgress(Math.min(records.length / cap, 1));
     const total = json.meta && typeof json.meta.total === 'number' ? json.meta.total : null;
     if (total != null) repoTotal = total;
 
@@ -319,7 +332,7 @@ function showApiUrl(url, requests, random){
 }
 
 /* ---------- scoring (mirrors get_spiral_data lines 2455-2519) ---------- */
-async function runSpiral(spiral, records){
+async function runSpiral(spiral, records, onProgress){
   const input = { data: records };
   const total = records.length;
   const items = [];
@@ -336,6 +349,7 @@ async function runSpiral(spiral, records){
     let comp = total > 0 ? matched / total : 0;            // line 2508: len(results)/total
     if (comp > 1) comp = 1;                                // trimLargeCounts
     items.push({ concept: item.concept, matched, comp, errored });
+    if (onProgress) onProgress();
   }
   const n = items.length || 1;
   items.sort((a,b) => a.concept.localeCompare(b.concept));   // alphabetical, matches get_spiral_data's sorted() columns
@@ -487,24 +501,30 @@ async function run(){
   $('repo-go').disabled = true;
   try {
     const { records, repoTotal } = await fetchRepo(clientId, cap, random);
-    if (!records.length){ setStatus('No records returned for that client ID.', true); return; }
+    if (!records.length){ hideProgress(); setStatus('No records returned for that client ID.', true); return; }
     const meta = await fetchClientMeta(clientId);
     renderSelection(clientId, meta, records.length, random, repoTotal);
     const sampleNote = random ? `random sample of ${records.length}` : `${records.length} most-recent`;
+
+    const totalQueries = SPIRALS.reduce((a,s)=>a + s.items.filter(i=>i.jq_query).length, 0);
+    let done = 0;
+    setStatus(`Scoring ${SPIRALS.length} use cases over ${records.length} records…`);
+    setProgress(0);
     const byCode = {};
     for (let i=0;i<SPIRALS.length;i++){
       const spiral = SPIRALS[i];
-      setStatus(`Scoring ${spiral.title} (${i+1}/${SPIRALS.length}) over ${records.length} records…`);
-      const res = await runSpiral(spiral, records);
+      const res = await runSpiral(spiral, records, () => { done++; setProgress(done/totalQueries); });
       byCode[spiral.code] = { spiral, res };
     }
     const total = computeTotal(byCode);
     lastRun = { byCode, total, records };
     renderTotal();
     showDetail();
+    hideProgress();
     setStatus(`Done — ${sampleNote} record${records.length===1?'':'s'}, total FAIR index ${fmtPct(total)}.`);
   } catch (e){
     console.error(e);
+    hideProgress();
     setStatus(e.message || String(e), true);
   } finally {
     $('repo-go').disabled = false;
@@ -576,15 +596,19 @@ document.addEventListener('click', e => { if (!e.target.closest('.hero-search'))
 $('repo-go').addEventListener('click', run);
 $('spiral').addEventListener('change', showDetail);
 populateSpirals();
+setStatus('Loading engine…');
+setProgressIndeterminate();
 whenJqReady().then(()=>{
   jqReady = true;
   $('repo-go').disabled = false;
+  hideProgress();
   if (location.protocol === 'file:') {
     setStatus('Engine ready — but this page is open as a local file (file://). DataCite requests will be blocked. Serve it over http (e.g. "python3 -m http.server" → http://localhost:8000/completeness.html).', true);
   } else {
     setStatus('Engine ready. Search for a repository (or enter a client ID) and click Explore.');
   }
 }).catch(e=>{
+  hideProgress();
   setStatus(e.message, true);
 });
 </script>

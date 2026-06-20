@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Re-Curation Watch — Completeness Spiral (prototype)</title>
+<title>Metadata Completeness — DataCite (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root{
     --accent:#9167b0; --accent-dk:#673289; --tint:#f0eaf5;
@@ -12,10 +15,61 @@
   }
   *{box-sizing:border-box}
   body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:0}
+
+  /* ── Brand top bar (ported from Re-Curation Watch) ── */
+  .topbar{border-bottom:2px solid var(--ink);padding:0 2rem}
+  .topbar-inner{max-width:1040px;margin:0 auto;display:flex;align-items:stretch;gap:0}
+  .topbar-brand{padding:.5rem 2rem .3rem 0;display:flex;flex-direction:row;align-items:flex-end;gap:1rem}
+  .brand-logo{height:64px;width:auto;display:block;flex-shrink:0}
+  .brand-title-wrap{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:.15rem}
+  .brand-tool-name{font-family:'Montserrat',sans-serif;font-size:2rem;font-weight:400;letter-spacing:.02em;color:#673289;line-height:1;white-space:nowrap;text-transform:uppercase}
+  .topbar-links{padding:0 0 0 1.5rem;display:flex;flex-direction:column;justify-content:center;gap:.25rem;margin-left:auto}
+  .topbar-links a{font-size:.72rem;color:var(--muted);text-decoration:none;white-space:nowrap;line-height:1.4}
+  .topbar-links a:hover{color:var(--accent-dk)}
+
+  /* ── Selection summary strip ── */
+  .sel-summary{background:#fff;border-bottom:1px solid var(--line)}
+  .sel-inner{max-width:1040px;margin:0 auto;padding:.7rem 2rem;display:flex;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
+  .sel-repo{font-size:.95rem;font-weight:600;color:var(--accent-dk)}
+  .sel-repo .sel-id{font-family:'IBM Plex Mono',monospace;font-size:.7rem;font-weight:400;color:var(--muted);margin-left:.5rem}
+  .sel-stats{display:flex;gap:1.4rem;flex-wrap:wrap;margin-left:auto}
+  .sel-stat{font-size:.78rem;color:var(--muted)}
+  .sel-stat b{color:var(--ink);font-weight:600}
+  @media(max-width:820px){.topbar{padding:0 1rem}.topbar-inner{flex-direction:column}.topbar-brand{padding-right:0}.brand-tool-name{font-size:1.5rem}.topbar-links{flex-direction:row;flex-wrap:wrap;gap:.75rem;padding:.25rem 0 .5rem}.sel-inner{padding:.7rem 1rem}.sel-stats{margin-left:0}}
   .wrap{max-width:1080px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
   h1{font-size:1.15rem;font-weight:600;margin:0 0 .15rem}
   .sub{color:var(--muted);font-size:.85rem;margin:0 0 1.25rem}
-  .proto-flag{display:inline-block;background:var(--tint);color:var(--accent-dk);font-size:.7rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:.15rem .5rem;border-radius:4px;margin-left:.4rem;vertical-align:middle}
+  .proto-flag{display:inline-block;background:#fff;color:var(--accent-dk);font-size:.62rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:.12rem .45rem;border-radius:4px;margin-left:.5rem;vertical-align:middle;border:1px solid var(--accent)}
+
+  /* ── Hero bar (ported from Re-Curation Watch) ── */
+  .hero{background:#f0eaf5;border-bottom:2px solid #9167b0;padding:1.75rem 2rem}
+  .hero-inner{max-width:1040px;margin:0 auto;display:flex;align-items:center;gap:2.5rem;flex-wrap:wrap}
+  .hero-text{flex:1;min-width:200px}
+  .hero-title{font-size:1.15rem;font-weight:600;color:#5b3d7a;line-height:1.2;margin:0 0 .3rem;letter-spacing:-.01em}
+  .hero-sub{font-size:.78rem;color:var(--muted);line-height:1.5;max-width:360px;margin:0}
+  .hero-search{flex:1;min-width:280px;position:relative}
+  .hero-form{display:flex;border:2px solid #9167b0;background:#fff}
+  .hero-input{flex:1;border:none;padding:.6rem .85rem;font-size:.85rem;outline:none;font-family:Inter,sans-serif;color:var(--ink);background:transparent}
+  .hero-input::placeholder{color:#a99bbf}
+  .hero-go{border:none;border-left:2px solid #9167b0;background:#9167b0;color:#fff;padding:.6rem 1.1rem;font-size:.82rem;font-weight:500;cursor:pointer;white-space:nowrap;font-family:Inter,sans-serif}
+  .hero-go:hover{background:#7a52a0}
+  .hero-secondary{display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;align-items:center}
+  .hero-secondary-label{font-size:.65rem;font-weight:600;color:#5b3d7a;text-transform:uppercase;letter-spacing:.03em}
+  .hero-select,.hero-num{border:1px solid rgba(145,103,176,.4);background:rgba(255,255,255,.85);padding:.32rem .6rem;font-family:Inter,sans-serif;font-size:.75rem;color:var(--ink);outline:none}
+  .hero-select{cursor:pointer;flex:1;min-width:150px}
+  .hero-num{width:74px}
+  .hero-select:focus,.hero-num:focus{border-color:#9167b0}
+  .hero-chk{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:#5b3d7a;cursor:pointer}
+  .repo-autocomplete{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--ink);border-top:none;z-index:200;display:none;max-height:260px;overflow-y:auto}
+  .repo-autocomplete.open{display:block}
+  .repo-ac-item{padding:.55rem .75rem;cursor:pointer;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:.1rem}
+  .repo-ac-item:last-child{border-bottom:none}
+  .repo-ac-item:hover,.repo-ac-item.highlighted{background:var(--bg)}
+  .repo-ac-name{font-size:.78rem;font-weight:500;color:var(--ink)}
+  .repo-ac-id{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--muted)}
+  .repo-ac-count{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:#0070C0}
+  .repo-ac-loading{padding:.6rem .75rem;font-size:.75rem;color:var(--muted);font-style:italic}
+  @media(max-width:820px){.hero{padding:1.25rem 1rem}.hero-inner{flex-direction:column;gap:1rem;align-items:stretch}.hero-text{min-width:0}.hero-search{min-width:0;width:100%}}
   .controls{display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-end;background:#fff;border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem;margin-bottom:1rem}
   .field{display:flex;flex-direction:column;gap:.25rem}
   .field label{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
@@ -27,6 +81,8 @@
   button.run:disabled{opacity:.5;cursor:default}
   label.chk{display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--muted);cursor:pointer}
   #status{font-size:.82rem;color:var(--muted);min-height:1.2em;margin:.2rem 0 1rem}
+  #apiurl{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.7rem;color:var(--muted);background:#f3f1f8;border-radius:6px;padding:.45rem .6rem;margin:0 0 1rem;word-break:break-all;line-height:1.5}
+  #apiurl b{color:var(--ink);font-weight:600}
   #status.err{color:#b4322f}
   .grid{display:grid;grid-template-columns:minmax(360px,1fr) 1fr;gap:1.5rem;align-items:start}
   @media(max-width:820px){.grid{grid-template-columns:1fr}}
@@ -62,40 +118,71 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Completeness Spiral<span class="proto-flag">prototype</span></h1>
-  <p class="sub">Runs the MGC spiral methodology client-side: live DataCite fetch → original jq queries (via jq-web/WASM) → completeness = records-with-element ÷ total records → radial spiral. Mirrors <code>get_spiral_data()</code>.</p>
-
-  <div class="controls">
-    <div class="field">
-      <label for="client">DataCite client ID</label>
-      <input id="client" type="text" value="sjyq.oozvia" spellcheck="false" autocomplete="off" />
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <a href="https://metadatagamechangers.com" target="_blank" rel="noopener">
+        <img class="brand-logo" src="https://images.squarespace-cdn.com/content/v1/52ffa419e4b05b374032e6d9/1577498408185-9LMHCVUJMNL2UBCIUOB9/Metadata+Game+Changers+Logo-Light.png?format=300w" alt="Metadata Game Changers" onerror="this.style.display='none'" />
+      </a>
+      <div class="brand-title-wrap"><div class="brand-tool-name">Metadata Completeness</div></div>
     </div>
-    <div class="field">
-      <label for="spiral">Spiral</label>
-      <select id="spiral"></select>
+    <div class="topbar-links">
+      <a href="https://metadata-game-changers.github.io/recuration-watch/" target="_blank" rel="noopener">Re-Curation Watch ↗</a>
+      <a href="https://metadatagamechangers.com" target="_blank" rel="noopener">Metadata Game Changers ↗</a>
     </div>
-    <div class="field">
-      <label for="cap">Max records</label>
-      <input id="cap" class="small" type="number" value="200" min="1" max="2000" />
-    </div>
-    <button class="run" id="run" disabled>Run</button>
   </div>
+</div>
 
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <h2 class="hero-title">Explore any DataCite Repository<span class="proto-flag">prototype</span></h2>
+      <p class="hero-sub">Search by repository name or enter a DataCite client ID to measure its metadata completeness across the FAIR use cases.</p>
+    </div>
+    <div class="hero-search">
+      <div class="hero-form">
+        <input class="hero-input" id="repo-input" type="text" placeholder="Repository name or client ID…" spellcheck="false" autocomplete="off" value="sjyq.oozvia" />
+        <button class="hero-go" id="repo-go" disabled>Explore →</button>
+      </div>
+      <div class="repo-autocomplete" id="repo-autocomplete"></div>
+      <div class="hero-secondary">
+        <span class="hero-secondary-label">Use case</span>
+        <select class="hero-select" id="spiral"></select>
+        <span class="hero-secondary-label">Max</span>
+        <input class="hero-num" id="cap" type="number" value="200" min="1" max="10000" />
+        <label class="hero-chk"><input type="checkbox" id="random" checked /> Random sample</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sel-summary" id="sel-summary" style="display:none">
+  <div class="sel-inner">
+    <span class="sel-repo" id="sel-repo">—</span>
+    <div class="sel-stats">
+      <span class="sel-stat"><b id="sel-records">—</b> records analyzed</span>
+      <span class="sel-stat" id="sel-mode">—</span>
+      <span class="sel-stat" id="sel-total"></span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
   <div id="status">Loading jq engine…</div>
+  <div id="apiurl" style="display:none"></div>
 
   <div class="card total-card" id="total-card" style="display:none">
-    <h2>FAIR completeness — all four spirals</h2>
+    <h2>FAIR completeness — all four use cases</h2>
     <div class="total-wrap">
       <div class="total-big"><b id="total-pct">—</b><span>Total index</span></div>
       <div class="total-breakdown" id="total-breakdown"></div>
     </div>
-    <div class="total-note">Total index = Σ(spiral average × concept count) ÷ Σ(concept count), across all four spirals. Click a spiral to inspect it below.</div>
+    <div class="total-note">Total index = Σ(use case average × concept count) ÷ Σ(concept count), across all four use cases. Click a use case to inspect it below.</div>
   </div>
 
   <div class="grid">
     <div class="card">
-      <h2>Spiral</h2>
+      <h2>Use case</h2>
       <div class="spiral-host" id="spiral-host"><svg id="radar" viewBox="0 0 460 460" width="460" height="460"></svg></div>
       <div class="legend" id="legend"></div>
     </div>
@@ -110,7 +197,7 @@
   </div>
 
   <div class="note">
-    <b>About:</b> This tool measures DataCite metadata completeness for a repository using the Metadata Game Changers FAIR spirals — Text, Identifiers, Connections, and Contacts. Each concept's score is the share of records that contain it; the Total index is the concept-weighted average across all four spirals. All scoring runs in your browser against live DataCite data — nothing is uploaded or stored.<br>
+    <b>About:</b> This tool measures DataCite metadata completeness for a repository using the Metadata Game Changers FAIR use cases — Text, Identifiers, Connections, and Contacts. Each concept's score is the share of records that contain it; the Total index is the concept-weighted average across all four use cases. All scoring runs in your browser against live DataCite data — nothing is uploaded or stored.<br>
     <b>Troubleshooting:</b> if the scoring engine can't load from a CDN, download <code>jq.asm.bundle.js</code> from <code>https://unpkg.com/jq-web@0.5.1/jq.asm.bundle.js</code>, place it beside this file, and point the loader's first source at <code>./jq.asm.bundle.js</code>.
   </div>
 </div>
@@ -175,18 +262,24 @@ async function jqAll(inputObj, filter){
 }
 
 /* ---------- DataCite fetch (mirrors loadRepository) ---------- */
-async function fetchRepo(clientId, cap){
+async function fetchRepo(clientId, cap, random){
   const records = [];
-  let page = 1;
-  const pageSize = Math.min(1000, cap);          // DataCite max page[size] is 1000; don't over-fetch a small cap
+  const seen = new Set();                         // dedup by DOI id across requests
+  const pageSize = Math.min(1000, cap);           // DataCite max page[size] is 1000
+  let page = 1, requests = 0, firstUrl = '', repoTotal = null;
   while (records.length < cap) {
-    const url = `${API_BASE}/dois?client-id=${encodeURIComponent(clientId)}&page[size]=${pageSize}&page[number]=${page}&sort=-updated&affiliation=true&publisher=true`;
-    setStatus(`Fetching records… (${records.length} so far)`);
+    requests++;
+    const base = `${API_BASE}/dois?client-id=${encodeURIComponent(clientId)}&page[size]=${pageSize}&affiliation=true&publisher=true`;
+    // random=true ignores page[number] & sort, so each request is an independent draw → dedup needed.
+    const url = random
+      ? `${base}&random=true&disable-facets=true`
+      : `${base}&page[number]=${page}&sort=-updated`;
+    if (!firstUrl) firstUrl = url;
+    setStatus(`Fetching records… (${records.length} unique so far)`);
     let res;
     try {
       res = await fetch(url);
     } catch (netErr) {
-      // TypeError: "Failed to fetch" — almost always file:// origin, no network, or a blocker.
       const hint = location.protocol === 'file:'
         ? 'The page is open as a local file (file://), and browsers block outbound requests from there. Serve it over http instead — e.g. run "python3 -m http.server" in this folder and open http://localhost:8000/completeness.html'
         : 'Could not reach api.datacite.org — check your network connection, VPN, or any request-blocking extension.';
@@ -195,12 +288,34 @@ async function fetchRepo(clientId, cap){
     if (!res.ok) throw new Error(`DataCite returned ${res.status} for client "${clientId}"`);
     const json = await res.json();
     const batch = json.data || [];
-    records.push(...batch);
-    const totalPages = json.meta && json.meta.totalPages ? json.meta.totalPages : page;
-    if (batch.length === 0 || page >= totalPages || page >= 10) break;   // page[number] caps at 10 (×1000 = 10,000 records)
-    page++;
+    let added = 0;
+    for (const r of batch){ if (!seen.has(r.id)){ seen.add(r.id); records.push(r); added++; } }
+    const total = json.meta && typeof json.meta.total === 'number' ? json.meta.total : null;
+    if (total != null) repoTotal = total;
+
+    if (random){
+      // stop when: target reached · whole repo collected · a draw added nothing new · hard request guard
+      if (records.length >= cap) break;
+      if (total != null && records.length >= total) break;
+      if (added === 0) break;
+      if (requests >= 30) break;
+    } else {
+      const totalPages = json.meta && json.meta.totalPages ? json.meta.totalPages : page;
+      if (batch.length === 0 || page >= totalPages || page >= 10) break;   // page[number] caps at 10 (×1000)
+      page++;
+    }
   }
-  return records.slice(0, cap);
+  showApiUrl(firstUrl, requests, random);
+  return { records: records.slice(0, cap), repoTotal };
+}
+
+function showApiUrl(url, requests, random){
+  const el = $('apiurl');
+  el.style.display = '';
+  const extra = random && requests > 1
+    ? ` · ${requests} random draws, deduplicated by DOI`
+    : (requests > 1 ? ` · ${requests} pages` : '');
+  el.innerHTML = `<b>API call:</b> ${url}${extra}`;
 }
 
 /* ---------- scoring (mirrors get_spiral_data lines 2455-2519) ---------- */
@@ -344,14 +459,38 @@ function showDetail(){
 }
 
 /* ---------- run handler ---------- */
-async function run(){
-  const clientId = $('client').value.trim();
-  const cap = Math.max(1, Math.min(2000, parseInt($('cap').value,10) || 200));
-  if (!clientId) return;
-  $('run').disabled = true;
+async function fetchClientMeta(clientId){
   try {
-    const records = await fetchRepo(clientId, cap);
+    const res = await fetch(`${API_BASE}/clients/${encodeURIComponent(clientId)}`);
+    if (!res.ok) return null;
+    const j = await res.json();
+    return { name: j.data?.attributes?.name ?? clientId, doiCount: j.data?.attributes?.doiCount ?? null };
+  } catch { return null; }
+}
+
+function renderSelection(clientId, meta, recordCount, random, repoTotal){
+  $('sel-summary').style.display = '';
+  const name = (meta && meta.name) ? meta.name : clientId;
+  $('sel-repo').innerHTML = `${escHtml(name)}<span class="sel-id">${escHtml(clientId)}</span>`;
+  $('sel-records').textContent = recordCount.toLocaleString();
+  $('sel-mode').textContent = random ? 'random sample' : 'most-recently-updated';
+  const repo = (repoTotal != null) ? repoTotal : (meta && meta.doiCount != null ? meta.doiCount : null);
+  $('sel-total').textContent = repo != null ? `of ${repo.toLocaleString()} in repository` : '';
+}
+
+async function run(){
+  const clientId = $('repo-input').value.trim();
+  const cap = Math.max(1, Math.min(10000, parseInt($('cap').value,10) || 200));
+  const random = $('random').checked;
+  if (!clientId) return;
+  closeAutocomplete();
+  $('repo-go').disabled = true;
+  try {
+    const { records, repoTotal } = await fetchRepo(clientId, cap, random);
     if (!records.length){ setStatus('No records returned for that client ID.', true); return; }
+    const meta = await fetchClientMeta(clientId);
+    renderSelection(clientId, meta, records.length, random, repoTotal);
+    const sampleNote = random ? `random sample of ${records.length}` : `${records.length} most-recent`;
     const byCode = {};
     for (let i=0;i<SPIRALS.length;i++){
       const spiral = SPIRALS[i];
@@ -363,26 +502,87 @@ async function run(){
     lastRun = { byCode, total, records };
     renderTotal();
     showDetail();
-    setStatus(`Done — ${records.length} records, total FAIR index ${fmtPct(total)}.`);
+    setStatus(`Done — ${sampleNote} record${records.length===1?'':'s'}, total FAIR index ${fmtPct(total)}.`);
   } catch (e){
     console.error(e);
     setStatus(e.message || String(e), true);
   } finally {
-    $('run').disabled = false;
+    $('repo-go').disabled = false;
   }
 }
 
+/* ---------- repository autocomplete (ported from Re-Curation Watch) ---------- */
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const escAttr = s => escHtml(s);
+let acTimer, acHighlight = -1, acItems = [];
+
+async function searchClients(q){
+  try {
+    const res = await fetch(`${API_BASE}/clients?query=${encodeURIComponent(q)}&page[size]=8`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data ?? []).map(d => ({ id: d.id, name: d.attributes?.name ?? d.id, count: d.attributes?.doiCount ?? null }));
+  } catch { return []; }
+}
+
+function showAutocomplete(items){
+  const box = $('repo-autocomplete');
+  acItems = items; acHighlight = -1;
+  if (!items.length){ box.classList.remove('open'); return; }
+  box.innerHTML = items.map((it,i) =>
+    `<div class="repo-ac-item" data-id="${escAttr(it.id)}" data-idx="${i}">
+      <span class="repo-ac-name">${escHtml(it.name)}</span>
+      <span class="repo-ac-id">${escHtml(it.id)}</span>
+      ${it.count != null ? `<span class="repo-ac-count">${it.count.toLocaleString()} DOIs</span>` : ''}
+    </div>`).join('');
+  box.classList.add('open');
+  box.querySelectorAll('.repo-ac-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      $('repo-input').value = el.dataset.id;
+      box.classList.remove('open');
+      run();
+    });
+  });
+}
+
+function closeAutocomplete(){ $('repo-autocomplete').classList.remove('open'); acHighlight = -1; }
+
+$('repo-input').addEventListener('input', () => {
+  const q = $('repo-input').value.trim();
+  clearTimeout(acTimer);
+  if (q.length < 2){ closeAutocomplete(); return; }
+  $('repo-autocomplete').innerHTML = '<div class="repo-ac-loading">Searching…</div>';
+  $('repo-autocomplete').classList.add('open');
+  acTimer = setTimeout(async () => showAutocomplete(await searchClients(q)), 300);
+});
+
+$('repo-input').addEventListener('keydown', e => {
+  const box = $('repo-autocomplete');
+  const open = box.classList.contains('open');
+  if (e.key === 'ArrowDown'){ e.preventDefault();
+    if (open && acHighlight < acItems.length - 1){ acHighlight++; box.querySelectorAll('.repo-ac-item').forEach((el,i)=>el.classList.toggle('highlighted', i===acHighlight)); }
+  } else if (e.key === 'ArrowUp'){ e.preventDefault();
+    if (open && acHighlight > 0){ acHighlight--; box.querySelectorAll('.repo-ac-item').forEach((el,i)=>el.classList.toggle('highlighted', i===acHighlight)); }
+  } else if (e.key === 'Enter'){ e.preventDefault();
+    if (open && acHighlight >= 0 && acItems[acHighlight]){ $('repo-input').value = acItems[acHighlight].id; closeAutocomplete(); run(); }
+    else { closeAutocomplete(); run(); }
+  } else if (e.key === 'Escape'){ closeAutocomplete(); }
+});
+
+document.addEventListener('click', e => { if (!e.target.closest('.hero-search')) closeAutocomplete(); });
+
 /* ---------- boot ---------- */
-$('run').addEventListener('click', run);
+$('repo-go').addEventListener('click', run);
 $('spiral').addEventListener('change', showDetail);
 populateSpirals();
 whenJqReady().then(()=>{
   jqReady = true;
-  $('run').disabled = false;
+  $('repo-go').disabled = false;
   if (location.protocol === 'file:') {
-    setStatus('jq engine ready — but this page is open as a local file (file://). DataCite requests will be blocked. Serve it over http (e.g. "python3 -m http.server" → http://localhost:8000/completeness.html).', true);
+    setStatus('Engine ready — but this page is open as a local file (file://). DataCite requests will be blocked. Serve it over http (e.g. "python3 -m http.server" → http://localhost:8000/completeness.html).', true);
   } else {
-    setStatus('jq engine ready. Pick a repository and spiral, then Run.');
+    setStatus('Engine ready. Search for a repository (or enter a client ID) and click Explore.');
   }
 }).catch(e=>{
   setStatus(e.message, true);

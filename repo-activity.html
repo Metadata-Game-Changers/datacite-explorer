@@ -515,7 +515,7 @@ function buildModel(events, g, stackBy){
 /* ---------- render: time chart ---------- */
 function renderChart(model){
   const svg = $('chart');
-  const W = 940, H = 380, mL = 48, mR = 12, mT = 14, mB = 64;
+  const W = 940, H = 380, mL = 64, mR = 12, mT = 14, mB = 64;
   const plotW = W-mL-mR, plotH = H-mT-mB;
   const ns = 'http://www.w3.org/2000/svg';
   svg.innerHTML = '';
@@ -533,6 +533,10 @@ function renderChart(model){
   }
   add('line',{x1:mL,y1:mT,x2:mL,y2:mT+plotH,stroke:'#d8d4e0','stroke-width':1});
   add('line',{x1:mL,y1:mT+plotH,x2:mL+plotW,y2:mT+plotH,stroke:'#d8d4e0','stroke-width':1});
+  // y-axis title (the unit depends on the stack mode: events vs property changes)
+  const yLabel = model.stackBy === 'action' ? 'events' : 'property changes';
+  const yc = mT + plotH/2;
+  add('text',{x:14,y:yc,'text-anchor':'middle','font-size':11,fill:'#6b7280',transform:`rotate(-90 14 ${yc})`}).textContent = yLabel;
   const n = bins.length, slot = plotW/n, bw = Math.max(1, Math.min(slot*0.8, 46));
   const labelEvery = Math.ceil(n/16);
   bins.forEach((bin,i)=>{

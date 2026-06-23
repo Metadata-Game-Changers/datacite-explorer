@@ -250,6 +250,7 @@
     <div class="total-actions">
       <button class="dl-btn" id="download-report" type="button">⬇ Download report (JSON)</button>
       <button class="dl-btn" id="download-html" type="button">⬇ Download report (HTML)</button>
+      <button class="dl-btn" id="download-summary" type="button">⬇ Download Use Case Summary (csv)</button>
       <button class="dl-btn" id="download-metadata" type="button">⬇ Download metadata (JSON)</button>
     </div>
   </div>
@@ -732,6 +733,42 @@ function downloadReport(){
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* ---------- one-row CSV summary ---------- */
+// A single summary row per run: repository id, datetime, records, the FAIR/Projects totals, and
+// each use case's average (0–1, 4 dp). Easy to append across repositories into one spreadsheet.
+function buildSummaryCsv(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const dt = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
+  const round = x => Math.round(x * 10000) / 10000;
+  const csv = v => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  // use-case columns follow the tab order: FAIR, then Projects, then Extras
+  const orderedCodes = [...GROUPS.FAIR, ...GROUPS.Projects, ...GROUPS.Extras];
+  const ordered = orderedCodes.map(code => SPIRALS[CODE_INDEX[code]]);
+  const headers = ['Repository_ID', 'DateTime', 'Records', 'FAIR_Total', 'Projects_Total', ...ordered.map(s => s.title)];
+  const row = [
+    lastRun.clientId, dt, lastRun.records.length,
+    round(weightedTotal(lastRun.byCode, GROUPS.FAIR)),
+    round(weightedTotal(lastRun.byCode, GROUPS.Projects)),
+    ...ordered.map(s => { const e = lastRun.byCode[s.code]; return e ? round(e.res.average) : ''; })
+  ];
+  return headers.map(csv).join(',') + '\r\n' + row.map(csv).join(',') + '\r\n';
+}
+function downloadSummary(){
+  if (!lastRun){ setStatus('Run an exploration first, then download the summary.', true); return; }
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
+  const safeId = (lastRun.clientId || 'repository').replace(/[^A-Za-z0-9._-]/g, '_');
+  const blob = new Blob([buildSummaryCsv()], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeId}_useCaseSummary__${stamp}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /* ---------- shareable HTML report (plots + tables) ---------- */
 // Standalone SVG radial plot as a string (mirrors renderRadar), so the report is fully self-contained.
 function radarSvgMarkup(items, color){
@@ -1118,6 +1155,7 @@ function stopTips(){ clearTimeout(tipDelay); clearInterval(tipTimer); tipDelay =
 $('download-report').addEventListener('click', downloadReport);
 $('download-html').addEventListener('click', downloadHtmlReport);
 $('download-metadata').addEventListener('click', downloadMetadata);
+$('download-summary').addEventListener('click', downloadSummary);
 $('copy-radar').addEventListener('click', copyRadar);
 document.querySelectorAll('#tabs .tab').forEach(b => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 selectTab('FAIR');

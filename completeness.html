@@ -549,18 +549,20 @@ function renderResults(spiral, res){
         ? '<span style="color:#b4322f;font-size:.78rem">query error (see console)</span>'
         : `<div class="bar" title="${i.matched} of ${res.total} records (${fmtPct(i.comp)})"><i style="width:${(i.comp*100).toFixed(1)}%;background:${color}"></i></div>`}</td>
     </tr>`).join('');
-  renderRadar(res.items, color);
-  $('legend').textContent = `${spiral.title} — ${res.items.length} concepts`;
+  renderRadar(res.items, color, spiral.title);
+  $('legend').textContent = `${res.items.length} concepts`;
   $('copy-radar').style.display = '';
 }
 
-function renderRadar(items, color){
+function renderRadar(items, color, title){
   const svg = $('radar');
   const W = 460, cx = W/2, cy = W/2, R = 165;
   const N = items.length;
   const ns = 'http://www.w3.org/2000/svg';
   svg.innerHTML = '';
   const add = (tag, attrs) => { const el = document.createElementNS(ns, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); svg.appendChild(el); return el; };
+  // title across the top of the plot, in the use-case colour
+  if (title){ add('text',{x:cx,y:18,'text-anchor':'middle','font-size':14,'font-weight':600,fill:color}).textContent = title; }
   const ang = i => (i / N) * 2 * Math.PI - Math.PI/2;   // start at top
   const pt = (i, r) => [cx + Math.cos(ang(i))*R*r, cy + Math.sin(ang(i))*R*r];
 

@@ -694,28 +694,51 @@ function showDetail(){
 // Same array structure as FAIR_spirals.json: per use case, keep its core properties and add the
 // run context (repository, filters, datetime) + computed stats, then items with completeness values.
 function buildReport(){
+  // Report layout: a top-level { repository, useCases } object. The repository block holds the
+  // run-level metadata; each use case carries its score and per-concept completeness. This is the
+  // format read by the methodology's repositoryUseCaseHistory tool.
   const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;  // to the hour, matches the file name
   const round = x => Math.round(x * 10000) / 10000;   // completeness as a 0–1 fraction
-  return SPIRALS.map(s => {
+
+  const analyzed  = lastRun.records.length;
+  const repoTotal = (lastRun.repoTotal != null) ? lastRun.repoTotal : analyzed;
+  const sampling  = (repoTotal > analyzed)
+    ? (lastRun.random ? 'random sample' : 'sequential sample')   // a subset was analyzed
+    : 'all records';                                             // the whole (matching) set was analyzed
+
+  const useCases = SPIRALS.map(s => {
     const e = lastRun.byCode[s.code];
     if (!e) return null;
     const res = e.res;
     return {
-      title: s.title,
       code: s.code,
+      title: s.title,
       dialect: s.dialect,
       description: s.description,
-      Repository_ID: lastRun.clientId,
-      'resource-type': lastRun.resourceTypeId || '',
-      query: lastRun.query || '',
-      'Current DateTime': d.toISOString(),
-      'Number of Records': res.total,
-      Exist: res.exist,
-      Complete: res.complete,
-      Average: round(res.average),
+      records: res.total,
+      average: round(res.average),
+      exist: res.exist,
+      complete: res.complete,
       items: res.items.map(i => ({ concept: i.concept, completeness: i.errored ? null : round(i.comp) }))
     };
   }).filter(Boolean);
+
+  return {
+    repository: {
+      id:                lastRun.clientId,
+      name:              lastRun.repoName || lastRun.clientId,
+      dateTime:          stamp,
+      records:           analyzed,
+      totalInRepository: repoTotal,
+      sampling:          sampling,
+      query:             lastRun.query || '',
+      fairTotal:         round(weightedTotal(lastRun.byCode, GROUPS.FAIR)),
+      projectsTotal:     round(weightedTotal(lastRun.byCode, GROUPS.Projects))
+    },
+    useCases
+  };
 }
 
 function downloadReport(){

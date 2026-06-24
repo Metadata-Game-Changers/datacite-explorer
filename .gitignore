@@ -1,0 +1,5 @@
+# Local Claude Code config (never committed)
+.claude/
+
+# macOS
+.DS_Store

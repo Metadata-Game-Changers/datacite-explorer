@@ -179,6 +179,7 @@
     <div class="topbar-links">
       <a href="https://metadata-game-changers.github.io/recuration-watch/" target="_blank" rel="noopener">Re-Curation Watch ↗</a>
       <a id="completeness-link" href="completeness.html" target="_blank" rel="noopener">Metadata Completeness ↗</a>
+      <a id="connectivity-link" href="metadataConnectivity.html" target="_blank" rel="noopener">Metadata Connectivity ↗</a>
       <a href="https://metadatagamechangers.com" target="_blank" rel="noopener">Metadata Game Changers ↗</a>
     </div>
   </div>
@@ -893,6 +894,7 @@ async function run(){
   const clientId = $('repo-input').value.trim().toLowerCase();
   if (!clientId) return;
   $('completeness-link').href = 'completeness.html?client=' + encodeURIComponent(clientId);   // carry repo to the completeness app
+  $('connectivity-link').href = 'metadataConnectivity.html?client=' + encodeURIComponent(clientId);
   closeAutocomplete();
   $('repo-go').disabled = true;
   $('period-card').style.display='none'; $('history-card').style.display='none';

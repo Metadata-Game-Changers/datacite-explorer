@@ -187,6 +187,7 @@
       <div class="brand-title-wrap"><div class="brand-tool-name">Metadata Completeness</div></div>
     </div>
     <div class="topbar-links">
+      <a id="connectivity-link" href="metadataConnectivity.html" target="_blank" rel="noopener">Metadata Connectivity ↗</a>
       <a id="activity-link" href="repo-activity.html" target="_blank" rel="noopener">Repository Activity ↗</a>
       <a href="useCases.html" target="_blank" rel="noopener">Use Cases ↗</a>
       <a href="https://metadatagamechangers.com" target="_blank" rel="noopener">Metadata Game Changers ↗</a>
@@ -1270,6 +1271,7 @@ async function run(){
   const query = $('query-input').value.trim();
   if (!clientId) return;
   $('activity-link').href = 'repo-activity.html?client=' + encodeURIComponent(clientId);   // carry repo to the activity app
+  $('connectivity-link').href = 'metadataConnectivity.html?client=' + encodeURIComponent(clientId);
   closeAutocomplete();
   $('repo-go').disabled = true;
   startTips();

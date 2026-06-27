@@ -101,6 +101,26 @@
   .conn-pct{font-variant-numeric:tabular-nums}
   .note{font-size:.78rem;color:var(--muted);background:var(--tint);border-radius:8px;padding:.7rem .85rem;line-height:1.5}
   .note code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.82em;background:#fff;padding:.05rem .3rem;border-radius:4px}
+  /* clickable bar + drill-down modal */
+  .conn-bar.clickable{cursor:pointer}
+  .conn-bar.clickable:hover{outline:2px solid var(--accent);outline-offset:1px}
+  .dl-btn{appearance:none;border:1px solid var(--accent);background:#fff;color:var(--accent-dk);font:inherit;font-size:.75rem;font-weight:600;padding:.42rem .85rem;border-radius:6px;cursor:pointer}
+  .dl-btn:hover{background:var(--tint)}
+  .modal-overlay{position:fixed;inset:0;background:rgba(31,35,48,.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:5vh 1rem}
+  .modal-card{background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.25);max-width:600px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--line)}
+  .modal-title{font-size:1rem;font-weight:600;color:var(--accent-dk)}
+  .modal-sub{font-size:.74rem;color:var(--muted);margin-top:.15rem}
+  .modal-head-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+  .modal-x{appearance:none;border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:.85rem;line-height:1}
+  .modal-x:hover{border-color:var(--accent);color:var(--accent-dk)}
+  .modal-body{padding:.4rem 1.1rem 1.1rem;overflow:auto}
+  table.cd-table{border-collapse:collapse;width:100%;font-size:.8rem}
+  table.cd-table th,table.cd-table td{text-align:left;padding:.32rem .5rem;border-bottom:1px solid #f0eef5;vertical-align:top}
+  table.cd-table th{font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+  table.cd-table td.num,table.cd-table th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.cd-table td.val{word-break:break-word}
+  td.pc-red{color:var(--red);font-weight:600} td.pc-amber{color:var(--amber);font-weight:600} td.pc-green{color:var(--green)}
 </style>
 </head>
 <body>
@@ -198,7 +218,7 @@
 
   <div class="card" id="conn-card" style="display:none">
     <h2 id="conn-title">Identifier connectivity</h2>
-    <p class="conn-intro">Connectivity is the share of things that carry the identifier that could connect them — e.g. of the creators in a repository, how many have a name identifier (ORCID). Each bar covers only the records that have that item; its segments show the % of those records where <b>every</b> item is identified (complete), <b>some</b> are (partial), or <b>none</b> are (missing).</p>
+    <p class="conn-intro">Connectivity is the share of things that carry the identifier that could connect them — e.g. of the creators in a repository, how many have a name identifier (ORCID). Each bar covers only the records that have that item; its segments show the % of those records where <b>every</b> item is identified (complete), <b>some</b> are (partial), or <b>none</b> are (missing). <b>Click any bar</b> to list the individual items (worst connectivity first) — the ones that need identifiers added.</p>
     <div class="conn-legend">
       <span><i style="background:var(--green)"></i>Complete — all possible identifiers present</span>
       <span><i style="background:var(--amber)"></i>Some — partially identified</span>
@@ -209,6 +229,24 @@
 
   <div class="note">
     <b>About:</b> This tool measures <b>identifier connectivity</b> for a DataCite repository — distinct from completeness (whether an element is present). For each connector it reports, of the records that contain it, the share where every item is identified, some are, or none are; the per-bar percentage is the overall fraction of items that carry the identifier. Connectors: creators &amp; contributors (name identifiers, affiliations, affiliation identifiers), funders (funder identifiers), and the publisher (publisher identifier). All computation runs in your browser against live DataCite data sent with <code>affiliation=true&amp;publisher=true</code> — nothing is uploaded or stored.
+  </div>
+</div>
+
+<!-- Drill-down: distinct entities and their connectivity (worst first) -->
+<div id="cd-modal" class="modal-overlay" style="display:none">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="cd-title">—</div>
+        <div class="modal-sub" id="cd-sub"></div>
+      </div>
+      <div class="modal-head-actions">
+        <button class="dl-btn" id="cd-copy" type="button" title="Copy the full list to the clipboard">⧉ Copy</button>
+        <button class="dl-btn" id="cd-download" type="button">⬇ CSV</button>
+        <button class="modal-x" id="cd-close" type="button" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="cd-body"></div>
   </div>
 </div>
 
@@ -352,17 +390,17 @@ function publisherConn(attr){
   return { conn: 1, id: p.publisherIdentifier ? 1 : 0 };
 }
 const CONNECTORS = [
-  { group:'Creators',     label:'Name identifiers (ORCID, etc.)',       fn: a => personConn(a.creators, 'nameId') },
-  { group:'Creators',     label:'Affiliations',                          fn: a => personConn(a.creators, 'aff') },
-  { group:'Creators',     label:'Affiliation identifiers (ROR, etc.)',   fn: a => personConn(a.creators, 'affId') },
-  { group:'Contributors', label:'Name identifiers (ORCID, etc.)',        fn: a => personConn(a.contributors, 'nameId') },
-  { group:'Contributors', label:'Affiliations',                          fn: a => personConn(a.contributors, 'aff') },
-  { group:'Contributors', label:'Affiliation identifiers (ROR, etc.)',   fn: a => personConn(a.contributors, 'affId') },
-  { group:'Funders',      label:'Funder identifiers',                    fn: a => funderConn(a) },
-  { group:'Publisher',    label:'Publisher identifier',                  fn: a => publisherConn(a) },
+  { group:'Creators',     label:'Name identifiers (ORCID, etc.)',       source:'creators',         kind:'nameId',    entity:'Creator',     fn: a => personConn(a.creators, 'nameId') },
+  { group:'Creators',     label:'Affiliations',                          source:'creators',         kind:'aff',       entity:'Creator',     fn: a => personConn(a.creators, 'aff') },
+  { group:'Creators',     label:'Affiliation identifiers (ROR, etc.)',   source:'creators',         kind:'affId',     entity:'Affiliation', fn: a => personConn(a.creators, 'affId') },
+  { group:'Contributors', label:'Name identifiers (ORCID, etc.)',        source:'contributors',     kind:'nameId',    entity:'Contributor', fn: a => personConn(a.contributors, 'nameId') },
+  { group:'Contributors', label:'Affiliations',                          source:'contributors',     kind:'aff',       entity:'Contributor', fn: a => personConn(a.contributors, 'aff') },
+  { group:'Contributors', label:'Affiliation identifiers (ROR, etc.)',   source:'contributors',     kind:'affId',     entity:'Affiliation', fn: a => personConn(a.contributors, 'affId') },
+  { group:'Funders',      label:'Funder identifiers',                    source:'fundingReferences', kind:'funder',   entity:'Funder',      fn: a => funderConn(a) },
+  { group:'Publisher',    label:'Publisher identifier',                  source:'publisher',         kind:'publisher', entity:'Publisher',   fn: a => publisherConn(a) },
 ];
 function computeConnectivity(records){
-  return CONNECTORS.map(c => {
+  return CONNECTORS.map((c, idx) => {
     let complete = 0, partial = 0, missing = 0, recordsWith = 0, sumConn = 0, sumId = 0;
     for (const r of records){
       const attr = r.attributes || {};
@@ -373,7 +411,7 @@ function computeConnectivity(records){
       else if (id >= conn) complete++;
       else partial++;
     }
-    return { group: c.group, label: c.label, complete, partial, missing, recordsWith,
+    return { idx, group: c.group, label: c.label, complete, partial, missing, recordsWith,
              overall: sumConn ? sumId / sumConn : 0, items: sumConn, identified: sumId };
   });
 }
@@ -397,11 +435,108 @@ function renderConnectivity(results){
         <div class="conn-label">${escHtml(res.label)}
           <span class="conn-meta">${res.identified.toLocaleString()} of ${res.items.toLocaleString()} identified · <b class="conn-pct">${(res.overall*100).toFixed(0)}%</b> · ${res.recordsWith.toLocaleString()} record${res.recordsWith===1?'':'s'}</span>
         </div>
-        <div class="conn-bar" title="complete ${c.toFixed(0)}% · some ${p.toFixed(0)}% · none ${m.toFixed(0)}%">${seg('green',c)}${seg('yellow',p)}${seg('red',m)}</div>
+        <div class="conn-bar clickable" data-idx="${res.idx}" title="complete ${c.toFixed(0)}% · some ${p.toFixed(0)}% · none ${m.toFixed(0)}% — click for the list">${seg('green',c)}${seg('yellow',p)}${seg('red',m)}</div>
       </div>`;
     }).join('');
     return `<div class="conn-group">${escHtml(g.name)}</div>${rows}`;
   }).join('');
+  $('conn-body').querySelectorAll('.conn-bar[data-idx]').forEach(el => el.addEventListener('click', () => openConnDetail(+el.dataset.idx)));
+}
+
+/* ---------- drill-down: distinct people / affiliations / funders / publishers and their connectivity ---------- */
+// Group by name across all records (occurrence-based, like the bar %): e.g. "University of Colorado"
+// appearing 8 times with 4 affiliationIdentifiers → 4/8 = 50%. Surfaces the items to go fix.
+function personDetail(records, source, kind){
+  const map = new Map();   // name -> {occ, id}
+  const bump = (name, has) => { if (name == null || name === '') return; let e = map.get(name); if (!e){ e = { occ:0, id:0 }; map.set(name, e); } e.occ++; if (has) e.id++; };
+  for (const r of records){
+    const arr = (r.attributes && Array.isArray(r.attributes[source])) ? r.attributes[source] : [];
+    for (const p of arr){
+      if (!p || typeof p !== 'object') continue;
+      if (kind === 'affId'){
+        for (const a of (Array.isArray(p.affiliation) ? p.affiliation : [])){ if (a && a.name) bump(a.name, !!a.affiliationIdentifier); }
+      } else {
+        const name = p.name || [p.givenName, p.familyName].filter(Boolean).join(' ');
+        if (!name) continue;
+        if (kind === 'nameId') bump(name, Array.isArray(p.nameIdentifiers) && p.nameIdentifiers.some(n => n && n.nameIdentifier));
+        else bump(name, Array.isArray(p.affiliation) && p.affiliation.some(a => a && a.name));
+      }
+    }
+  }
+  return map;
+}
+function funderDetail(records){
+  const map = new Map();
+  for (const r of records){
+    for (const f of ((r.attributes && Array.isArray(r.attributes.fundingReferences)) ? r.attributes.fundingReferences : [])){
+      if (!f || !f.funderName) continue;
+      let e = map.get(f.funderName); if (!e){ e = { occ:0, id:0 }; map.set(f.funderName, e); }
+      e.occ++; if (f.funderIdentifier) e.id++;
+    }
+  }
+  return map;
+}
+function publisherDetail(records){
+  const map = new Map();
+  for (const r of records){
+    const p = r.attributes && r.attributes.publisher; if (!p) continue;
+    const name = typeof p === 'string' ? p : p.name; if (!name) continue;
+    let e = map.get(name); if (!e){ e = { occ:0, id:0 }; map.set(name, e); }
+    e.occ++; if (typeof p === 'object' && p.publisherIdentifier) e.id++;
+  }
+  return map;
+}
+function connDetail(records, c){
+  if (c.kind === 'funder') return funderDetail(records);
+  if (c.kind === 'publisher') return publisherDetail(records);
+  return personDetail(records, c.source, c.kind);
+}
+let connDetailState = null;   // { entries:[{name,occ,id,pct}], c }
+function openConnDetail(idx){
+  if (!lastRun) return;
+  const c = CONNECTORS[idx];
+  const entries = [...connDetail(lastRun.records, c).entries()]
+    .map(([name, e]) => ({ name, occ: e.occ, id: e.id, pct: e.occ ? e.id / e.occ : 0 }))
+    .sort((a, b) => a.pct - b.pct || b.occ - a.occ || a.name.localeCompare(b.name));   // worst connectivity first
+  connDetailState = { entries, c };
+  const missing = entries.filter(e => e.id === 0).length;
+  const partial = entries.filter(e => e.id > 0 && e.id < e.occ).length;
+  const complete = entries.filter(e => e.id >= e.occ).length;
+  const ent = c.entity.toLowerCase();
+  $('cd-title').textContent = `${c.group} · ${c.label.split(' (')[0]}`;
+  $('cd-sub').textContent = `${entries.length.toLocaleString()} distinct ${ent}${entries.length===1?'':'s'} · ${missing} missing · ${partial} partial · ${complete} complete`;
+  const cls = e => e.id === 0 ? 'pc-red' : (e.id >= e.occ ? 'pc-green' : 'pc-amber');
+  $('cd-body').innerHTML = entries.length === 0
+    ? '<div style="padding:1rem;color:#6b7280;font-size:.8rem">No items found in the analyzed sample.</div>'
+    : `<table class="cd-table"><thead><tr><th>${escHtml(c.entity)}</th><th class="num">Occurrences</th><th class="num">Identified</th><th class="num">%</th></tr></thead><tbody>`
+      + entries.map(e => `<tr><td class="val">${escHtml(e.name)}</td><td class="num">${e.occ.toLocaleString()}</td><td class="num">${e.id.toLocaleString()}</td><td class="num ${cls(e)}">${(e.pct*100).toFixed(0)}%</td></tr>`).join('')
+      + '</tbody></table>';
+  $('cd-modal').style.display = 'flex';
+}
+function closeConnDetail(){ $('cd-modal').style.display = 'none'; connDetailState = null; }
+function connDetailFilename(ext){
+  const safeId = (lastRun.clientId || 'repository').replace(/[^A-Za-z0-9._-]/g, '_');
+  const tag = `${connDetailState.c.group}_${connDetailState.c.label.split(' (')[0]}`.replace(/[^A-Za-z0-9._-]+/g, '_');
+  return `${safeId}_${tag}_connectivity.${ext}`;
+}
+function connDetailDownloadCsv(){
+  if (!connDetailState) return;
+  const csv = v => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const head = [connDetailState.c.entity, 'Occurrences', 'Identified', 'Percent'];
+  const body = [head, ...connDetailState.entries.map(e => [csv(e.name), e.occ, e.id, (e.pct*100).toFixed(0)])].map(r => r.join(',')).join('\r\n') + '\r\n';
+  const url = URL.createObjectURL(new Blob([body], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = connDetailFilename('csv');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function connDetailCopy(){
+  if (!connDetailState) return;
+  const tsv = [`${connDetailState.c.entity}\tOccurrences\tIdentified\tPercent`,
+    ...connDetailState.entries.map(e => `${String(e.name).replace(/[\t\n\r]/g, ' ')}\t${e.occ}\t${e.id}\t${(e.pct*100).toFixed(0)}`)].join('\n');
+  const btn = $('cd-copy');
+  try { await navigator.clipboard.writeText(tsv); btn.textContent = '✓ Copied'; }
+  catch (e){ btn.textContent = 'Copy failed'; }
+  setTimeout(() => { btn.textContent = '⧉ Copy'; }, 1600);
 }
 
 /* ---------- run ---------- */
@@ -488,6 +623,11 @@ document.addEventListener('click', e => { if (!e.target.closest('.hero-search'))
 
 /* ---------- boot ---------- */
 $('repo-go').addEventListener('click', run);
+$('cd-close').addEventListener('click', closeConnDetail);
+$('cd-copy').addEventListener('click', connDetailCopy);
+$('cd-download').addEventListener('click', connDetailDownloadCsv);
+$('cd-modal').addEventListener('click', e => { if (e.target.id === 'cd-modal') closeConnDetail(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('cd-modal').style.display !== 'none') closeConnDetail(); });
 if (location.protocol === 'file:') {
   setStatus('This page is open as a local file (file://). DataCite requests will be blocked — serve it over http (e.g. "python3 -m http.server" → http://localhost:8000/metadataConnectivity.html).', true);
 }

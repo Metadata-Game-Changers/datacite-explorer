@@ -279,12 +279,12 @@
         <button class="dl-btn" id="dup-csv" type="button">⬇ Duplicates (CSV)</button>
       </div>
     </div>
-    <p class="conn-intro">Likely-same people and organizations that appear under more than one spelling — to review and reconcile. This <b>does not change the bars above</b>. <b>High confidence</b> clusters share an identifier (the same ORCID/ROR under different names); <b>review</b> clusters are fuzzy string matches. “Can propagate” counts occurrences that could inherit a known identifier already present on another spelling. Acronyms vs full names (e.g. “MIT” vs the spelled-out name) only match when they share an identifier.</p>
+    <p class="conn-intro">Likely-same people, organizations, and rights statements that appear under more than one spelling — to review and reconcile. This <b>does not change the bars above</b>. <b>High confidence</b> clusters share an identifier (the same ORCID/ROR under different names); <b>review</b> clusters are fuzzy string matches. “Can propagate” counts occurrences that could inherit a known identifier already present on another spelling. Acronyms vs full names (e.g. “MIT” vs the spelled-out name) only match when they share an identifier.</p>
     <div id="dup-body"></div>
   </div>
 
   <div class="note">
-    <b>About:</b> This tool measures <b>identifier connectivity</b> for a DataCite repository — distinct from completeness (whether an element is present). For each connector it reports, of the records that contain it, the share where every item is identified, some are, or none are; the per-bar percentage is the overall fraction of items that carry the identifier. Connectors: creators &amp; contributors (name identifiers, affiliations, affiliation identifiers), funders (funder identifiers), and the publisher (publisher identifier). All computation runs in your browser against live DataCite data sent with <code>affiliation=true&amp;publisher=true</code> — nothing is uploaded or stored.
+    <b>About:</b> This tool measures <b>identifier connectivity</b> for a DataCite repository — distinct from completeness (whether an element is present). For each connector it reports, of the records that contain it, the share where every item is identified, some are, or none are; the per-bar percentage is the overall fraction of items that carry the identifier. Connectors: creators &amp; contributors (name identifiers, affiliations, affiliation identifiers), funders (funder identifiers), the publisher (publisher identifier), and rights (rights URIs, rights identifiers). All computation runs in your browser against live DataCite data sent with <code>affiliation=true&amp;publisher=true</code> — nothing is uploaded or stored.
   </div>
 </div>
 
@@ -420,6 +420,8 @@ const CONNECTORS = [
   { group:'Contributors', label:'Affiliation identifiers (ROR, etc.)',   source:'contributors',      kind:'affId',     entity:'Affiliation' },
   { group:'Funders',      label:'Funder identifiers',                    source:'fundingReferences', kind:'funder',    entity:'Funder' },
   { group:'Publisher',    label:'Publisher identifier',                  source:'publisher',         kind:'publisher', entity:'Publisher' },
+  { group:'Rights',       label:'Rights URIs',                           source:'rightsList',        kind:'rightsUri', entity:'Rights statement' },
+  { group:'Rights',       label:'Rights identifiers (SPDX, etc.)',       source:'rightsList',        kind:'rightsId',  entity:'Rights statement' },
 ];
 function computeConnectivity(records){
   return CONNECTORS.map((c, idx) => {
@@ -508,9 +510,24 @@ function publisherDetail(records){
   }
   return map;
 }
+// Group by the distinct rights statement (its name, falling back to the URI/identifier), counting
+// how many occurrences carry a rightsUri or a rightsIdentifier — same shape as the other detail maps.
+function rightsDetail(records, kind){
+  const map = new Map();
+  for (const r of records){
+    for (const x of ((r.attributes && Array.isArray(r.attributes.rightsList)) ? r.attributes.rightsList : [])){
+      if (!x || typeof x !== 'object') continue;
+      const name = x.rights || x.rightsUri || x.rightsIdentifier; if (!name) continue;
+      let e = map.get(name); if (!e){ e = { occ:0, id:0 }; map.set(name, e); }
+      e.occ++; if (kind === 'rightsUri' ? !!x.rightsUri : !!x.rightsIdentifier) e.id++;
+    }
+  }
+  return map;
+}
 function connDetail(records, c){
   if (c.kind === 'funder') return funderDetail(records);
   if (c.kind === 'publisher') return publisherDetail(records);
+  if (c.kind === 'rightsUri' || c.kind === 'rightsId') return rightsDetail(records, c.kind);
   return personDetail(records, c.source, c.kind);
 }
 let connDetailState = null;   // { entries:[{name,occ,id,pct}], c }
@@ -636,7 +653,8 @@ function buildConnReport(){
     potentialDuplicates: {
       threshold:    dup.threshold,
       people:       serializeClusters(dup.people),
-      affiliations: serializeClusters(dup.affiliations)
+      affiliations: serializeClusters(dup.affiliations),
+      rights:       serializeClusters(dup.rights)
     }
   };
 }
@@ -766,6 +784,7 @@ function dupReportSection(){
     <h2>Potential duplicates <span class="dups-note">advisory — does not affect the bars above</span></h2>
     ${pool('People (creators + contributors)', dup.people)}
     ${pool('Affiliations', dup.affiliations)}
+    ${pool('Rights statements', dup.rights)}
   </section>`;
 }
 function downloadConnReportHtml(){
@@ -1047,6 +1066,51 @@ function collectAffiliations(records){
   }
   return [...map.values()];
 }
+// Pool distinct rights statements; their connecting identifiers are the rightsUri and rightsIdentifier
+// (e.g. an SPDX id). Keep the full URL in the match key (host included) — unlike ORCID/ROR the whole URI
+// is the identifier — so different rights schemes don't collide.
+// Dedup targets license *names* ("CC BY 4.0" vs "Creative Commons Attribution 4.0 International"),
+// so skip per-record copyright statements ("Copyright (c) 2025 …") and long free-text usage agreements —
+// those legitimately differ per record and aren't name variants of one license.
+function isLicenseLike(name){
+  if (!name || name.length > 120) return false;
+  return !/^\s*(copyright\b|\(c\)|\(p\)|©|all rights reserved)/i.test(name);
+}
+function collectRights(records){
+  const ridKey = v => String(v).toLowerCase().replace(/^https?:\/\//, '').replace(/[^a-z0-9]/g, '');
+  const ridDisplay = v => String(v).replace(/\/+$/, '').trim();
+  const map = new Map();
+  const add = (name, idvals) => {
+    if (!name || !isLicenseLike(name)) return;
+    let e = map.get(name);
+    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set() }; map.set(name, e); }
+    e.occ++; if (idvals.length) e.id++;
+    for (const v of idvals) e.ids.set(ridKey(v), ridDisplay(v));
+  };
+  for (const r of records){
+    for (const x of ((r.attributes && Array.isArray(r.attributes.rightsList)) ? r.attributes.rightsList : [])){
+      if (!x || typeof x !== 'object') continue;
+      const name = x.rights || x.rightsUri || x.rightsIdentifier; if (!name) continue;
+      add(name, [x.rightsUri, x.rightsIdentifier].filter(Boolean));
+    }
+  }
+  return [...map.values()];
+}
+// Precompute the affiliation/rights matching fields: normalized form, token set, and a block key
+// (alphabetically-first content word, shared across abbreviation variants), ignoring stopwords.
+function prepTextEntity(e){
+  e.norm = normAffil(e.name);
+  e.tokenSet = [...new Set(e.norm.split(' ').filter(Boolean))];
+  const content = e.tokenSet.filter(t => t.length > 1 && !AFFIL_STOP.has(t)).sort();
+  e.block = ((content[0] || e.tokenSet.slice().sort()[0]) || '').slice(0, 3) || '#';
+}
+// Two entities whose identifier sets are both non-empty and share nothing are authoritatively
+// distinct (different ORCIDs/RORs/SPDX ids) — they must never be merged on name similarity alone.
+function idsDisjoint(a, b){
+  if (!a.ids.size || !b.ids.size) return false;
+  for (const k of a.ids.keys()) if (b.ids.has(k)) return false;
+  return true;
+}
 // Are all members of a cluster mutually linkable by name alone? (single component under `sim`)
 function nameCoherent(members, sim){
   const k = members.length;
@@ -1056,19 +1120,22 @@ function nameCoherent(members, sim){
   const root = uf.find(0);
   return members.every((_, i) => uf.find(i) === root);
 }
+// sim may be null — then clustering is identifier-anchored only (used for rights, where the SPDX id /
+// URI is the license's identity and name similarity is unreliable across CC-BY vs CC-BY-NC etc.).
 function clusterEntities(entities, sim){
   const n = entities.length, uf = makeUF(n);
   // 1) identifier-anchored unions (always)
   const byId = new Map();
   entities.forEach((e, i) => { for (const v of e.ids.keys()){ if (byId.has(v)) uf.union(i, byId.get(v)); else byId.set(v, i); } });
-  // 2) fuzzy unions within blocks (skipped for very large entity counts)
-  if (n <= DUP_MAX_FUZZY){
+  // 2) fuzzy unions within blocks (skipped when sim is null, or for very large entity counts)
+  if (sim && n <= DUP_MAX_FUZZY){
     const blocks = new Map();
     entities.forEach((e, i) => { const k = e.block || '#'; if (!blocks.has(k)) blocks.set(k, []); blocks.get(k).push(i); });
     for (const idxs of blocks.values()){
       for (let a = 0; a < idxs.length; a++) for (let b = a + 1; b < idxs.length; b++){
         const i = idxs[a], j = idxs[b];
         if (uf.find(i) === uf.find(j)) continue;
+        if (idsDisjoint(entities[i], entities[j])) continue;   // distinct identifiers ⇒ never fuzzy-merge
         if (sim(entities[i], entities[j])) uf.union(i, j);
       }
     }
@@ -1083,7 +1150,7 @@ function clusterEntities(entities, sim){
     const idCount = new Map();
     members.forEach(m => { for (const v of m.ids.keys()) idCount.set(v, (idCount.get(v) || 0) + 1); });
     const shared = [...idCount.values()].some(c => c >= 2);   // same identifier on ≥2 spellings
-    const conflict = shared && !nameCoherent(members, sim);   // one identifier across genuinely different names
+    const conflict = sim ? (shared && !nameCoherent(members, sim)) : false;   // needs name similarity to judge
     const totalOcc = members.reduce((s, m) => s + m.occ, 0);
     const totalId  = members.reduce((s, m) => s + m.id, 0);
     const canonical = members.reduce((best, m) => (m.occ > best.occ || (m.occ === best.occ && m.name.length > best.name.length)) ? m : best, members[0]);
@@ -1104,19 +1171,13 @@ function findDuplicates(records, threshold){
   const t = DUP_THRESHOLDS[threshold] || DUP_THRESHOLDS.balanced;
   const people = collectPeople(records);
   people.forEach(e => { e.tokens = nameParts(e.name); e.block = (e.tokens[e.tokens.length - 1] || '').slice(0, 1) || '#'; });
-  const affils = collectAffiliations(records);
-  affils.forEach(e => {
-    e.norm = normAffil(e.name);
-    e.tokenSet = [...new Set(e.norm.split(' ').filter(Boolean))];
-    // block by the alphabetically-first content word (shared across abbreviation variants, e.g.
-    // "University of Colorado" / "Univ. of Colorado" both block on "colorado"), ignoring stopwords
-    const content = e.tokenSet.filter(t => t.length > 1 && !AFFIL_STOP.has(t)).sort();
-    e.block = ((content[0] || e.tokenSet.slice().sort()[0]) || '').slice(0, 3) || '#';
-  });
+  const affils = collectAffiliations(records); affils.forEach(prepTextEntity);
+  const rights = collectRights(records);   // identifier-anchored only — no name precompute needed
   return {
     threshold,
     people:       clusterEntities(people, (a, b) => personSimilar(a, b, t.jw)),
-    affiliations: clusterEntities(affils, (a, b) => affilSimilar(a, b, t.jw, t.jac))
+    affiliations: clusterEntities(affils, (a, b) => affilSimilar(a, b, t.jw, t.jac)),
+    rights:       clusterEntities(rights, null)
   };
 }
 
@@ -1150,7 +1211,8 @@ function renderDuplicates(){
     return head + (clusters.length ? clusters.map(c => dupClusterMarkup(c, entLabel)).join('') : '<div class="conn-empty">— none found at this match level —</div>');
   };
   $('dup-body').innerHTML = section('People (creators + contributors)', dup.people, 'Person')
-                          + section('Affiliations', dup.affiliations, 'Affiliation');
+                          + section('Affiliations', dup.affiliations, 'Affiliation')
+                          + section('Rights statements', dup.rights, 'Rights statement');
   $('dup-card').style.display = '';
 }
 function duplicateRows(){
@@ -1158,7 +1220,7 @@ function duplicateRows(){
   const rows = [['Pool', 'ClusterID', 'Canonical', 'Confidence', 'Basis', 'Variant', 'Occurrences', 'Identified', 'Sources', 'Identifier']];
   const addPool = (pool, clusters) => clusters.forEach((c, i) => { const cid = `${pool[0]}${i + 1}`;
     c.variants.forEach(v => rows.push([pool, cid, c.canonical, c.confidence, c.basis, v.name, v.occ, v.id, v.sources.join('; '), v.identifier])); });
-  addPool('People', dup.people); addPool('Affiliation', dup.affiliations);
+  addPool('People', dup.people); addPool('Affiliation', dup.affiliations); addPool('Rights', dup.rights);
   return rows;
 }
 function buildDuplicatesCsv(){

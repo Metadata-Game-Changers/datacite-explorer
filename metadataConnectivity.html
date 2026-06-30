@@ -1036,6 +1036,45 @@ function downloadConnPdf(){
     }
   }
 
+  // ── potential duplicates (advisory) — mirrors the panel / HTML report ──
+  const dup = lastRun.duplicates || findDuplicates(lastRun.records, dupThreshold());
+  const pools = [['People (creators + contributors)', dup.people], ['Affiliations', dup.affiliations], ['Rights statements', dup.rights]];
+  if (pools.some(([, c]) => c.length)){
+    ensure(44);
+    y += 12;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); ink(C.accentDk);
+    doc.text('Potential duplicates (advisory)', x0, y + 8);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); ink(C.muted);
+    doc.text(T('Likely-same entities under more than one spelling - does not affect the bars above.'), x0, y + 20);
+    y += 30;
+    const confLabel = c => c.confidence === 'conflict' ? 'shared id / different names' : c.confidence === 'high' ? 'identifier match' : 'fuzzy match';
+    for (const [title, clusters] of pools){
+      const hi = clusters.filter(c => c.confidence === 'high').length;
+      const cf = clusters.filter(c => c.confidence === 'conflict').length;
+      const tags = [hi ? `${hi} identifier-confirmed` : '', cf ? `${cf} shared-id conflict${cf===1?'':'s'}` : ''].filter(Boolean).join(' · ');
+      ensure(22);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); ink(C.muted);
+      doc.text(T(`${title.toUpperCase()} - ${clusters.length} ${clusters.length===1?'cluster':'clusters'}${tags?' · '+tags:''}`), x0, y + 8);
+      draw(C.line); doc.line(x0, y + 12, x0 + contentW, y + 12);
+      y += 18;
+      if (!clusters.length){
+        doc.setFont('helvetica','italic'); doc.setFontSize(8); ink(C.muted);
+        doc.text('none found at this match level', x0 + 4, y + 4); y += 16; continue;
+      }
+      for (const c of clusters){
+        ensure(13);
+        const meta = `${c.variants.length} spellings · ${confLabel(c)}${c.propagatable>0?` · ${c.propagatable.toLocaleString()} can propagate`:''}`;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+        const metaW = doc.getTextWidth(T(meta));
+        ink(C.ink); doc.text(ellip(c.canonical, contentW - metaW - 12), x0, y + 7);
+        ink(c.confidence === 'conflict' ? C.red : C.muted); doc.setFontSize(8.5);
+        doc.text(T(meta), x0 + contentW, y + 7, { align:'right' });
+        y += 12;
+      }
+      y += 6;
+    }
+  }
+
   // ── footer ──
   ensure(30);
   draw(C.line); doc.line(x0, y + 4, x0 + contentW, y + 4);

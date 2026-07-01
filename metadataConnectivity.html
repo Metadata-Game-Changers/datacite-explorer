@@ -287,6 +287,12 @@
             <option value="loose">loose</option>
           </select>
         </label>
+        <label class="dup-th">Sort
+          <select id="dup-sort" title="A–Z sorts by name (to find an entity). Impact sorts by ‘can propagate’ — occurrences that could inherit an identifier already present on another spelling — then how widespread the entity is.">
+            <option value="name" selected>A–Z</option>
+            <option value="impact">impact</option>
+          </select>
+        </label>
         <button class="dl-btn" id="dup-copy" type="button" title="Copy all clusters to the clipboard">⧉ Copy</button>
         <button class="dl-btn" id="dup-csv" type="button">⬇ Duplicates (CSV)</button>
       </div>
@@ -1377,7 +1383,7 @@ function dupBadges(cl){
     : cl.confidence === 'high'
       ? '<span class="dup-badge hi">high · identifier match</span>'
       : '<span class="dup-badge med">review · fuzzy match</span>';
-  const prop = cl.propagatable > 0 ? `<span class="dup-badge prop">${cl.propagatable.toLocaleString()} can propagate</span>` : '';
+  const prop = cl.propagatable > 0 ? `<span class="dup-badge prop" title="Occurrences that could inherit an identifier already present on another spelling in this cluster — the propagatable count used by the Impact sort">${cl.propagatable.toLocaleString()} can propagate</span>` : '';
   return conf + prop;
 }
 // Render an identifier value as a link to its home page when recognizable (ORCID, ROR, a URL, or an SPDX id).
@@ -1402,10 +1408,23 @@ function dupClusterMarkup(cl, entLabel, pool, ci){
   return `<details class="dup-cl"><summary><span class="dup-canon">${escHtml(cl.canonical)}</span> <span class="dup-count">${cl.variants.length} spellings · ${cl.totalOcc.toLocaleString()} occ</span> ${dupBadges(cl)}</summary>
     <table class="cd-table"><thead><tr><th>${escHtml(entLabel)}</th><th class="num">Occ</th><th class="num">Identified</th><th>Source</th><th>Identifier</th></tr></thead><tbody>${rows}</tbody></table></details>`;
 }
-function renderDuplicates(){
+function dupSortMode(){ const el = $('dup-sort'); return el ? el.value : 'name'; }
+function sortClusters(clusters, mode){
+  if (mode === 'impact')   // biggest identifier-propagation opportunity first, then most widespread, then most spellings
+    clusters.sort((a, b) => b.propagatable - a.propagatable || b.totalOcc - a.totalOcc || b.variants.length - a.variants.length);
+  else                     // A–Z by name, for finding a specific entity
+    clusters.sort((a, b) => a.canonical.localeCompare(b.canonical, undefined, { sensitivity:'base' }));
+}
+function renderDuplicates(){   // recompute (initial run / threshold change), then render
   if (!lastRun) return;
-  const dup = findDuplicates(lastRun.records, dupThreshold());
-  lastRun.duplicates = dup; dupState = dup;
+  lastRun.duplicates = findDuplicates(lastRun.records, dupThreshold());
+  dupState = lastRun.duplicates;
+  renderDupBody();
+}
+function renderDupBody(){      // sort by the current toggle and build the DOM (no recompute — used on sort change)
+  if (!lastRun || !lastRun.duplicates) return;
+  const dup = lastRun.duplicates, mode = dupSortMode();
+  for (const k of ['people', 'affiliations', 'rights']) sortClusters(dup[k], mode);
   const section = (title, clusters, entLabel, poolKey) => {
     const hi = clusters.filter(c => c.confidence === 'high').length;
     const cf = clusters.filter(c => c.confidence === 'conflict').length;
@@ -1626,6 +1645,7 @@ $('dl-png').addEventListener('click', downloadConnPng);
 $('dl-summary').addEventListener('click', downloadConnSummary);
 $('dl-metadata').addEventListener('click', downloadConnMetadata);
 $('dup-threshold').addEventListener('change', () => { if (lastRun) renderDuplicates(); });
+$('dup-sort').addEventListener('change', () => { if (lastRun && lastRun.duplicates) renderDupBody(); });
 $('dup-copy').addEventListener('click', dupCopy);
 $('dup-csv').addEventListener('click', downloadDuplicatesCsv);
 $('cd-close').addEventListener('click', closeConnDetail);

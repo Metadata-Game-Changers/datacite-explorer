@@ -147,6 +147,10 @@
   table.cd-table th{font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
   table.cd-table td.num,table.cd-table th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   table.cd-table td.val{word-break:break-word}
+  table.cd-table td.val a{color:var(--accent-dk);text-decoration:none}
+  table.cd-table td.val a:hover{text-decoration:underline}
+  a.dup-doc-link{color:var(--accent-dk);cursor:pointer;border-bottom:1px dotted var(--accent);font-variant-numeric:tabular-nums}
+  a.dup-doc-link:hover{color:var(--accent);border-bottom-style:solid}
   td.pc-red{color:var(--red);font-weight:600} td.pc-amber{color:var(--amber);font-weight:600} td.pc-green{color:var(--green)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
@@ -306,6 +310,23 @@
       </div>
     </div>
     <div class="modal-body" id="cd-body"></div>
+  </div>
+</div>
+
+<!-- Duplicates drill-down: the DOIs where a variant spelling occurs -->
+<div id="dd-modal" class="modal-overlay" style="display:none">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="dd-title">—</div>
+        <div class="modal-sub" id="dd-sub"></div>
+      </div>
+      <div class="modal-head-actions">
+        <button class="dl-btn" id="dd-copy" type="button" title="Copy the DOI list to the clipboard">⧉ Copy</button>
+        <button class="modal-x" id="dd-close" type="button" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="dd-body"></div>
   </div>
 </div>
 
@@ -639,7 +660,7 @@ function buildConnReport(){
   const serializeClusters = arr => arr.map(c => ({
     canonical: c.canonical, confidence: c.confidence, basis: c.basis, conflict: !!c.conflict,
     totalOccurrences: c.totalOcc, identifiedOccurrences: c.totalId, propagatable: c.propagatable,
-    variants: c.variants.map(v => ({ name: v.name, occurrences: v.occ, identified: v.id, sources: v.sources, identifier: v.identifier }))
+    variants: c.variants.map(v => ({ name: v.name, occurrences: v.occ, identified: v.id, sources: v.sources, identifier: v.identifier, dois: (v.docs || []).map(d => d.doi) }))
   }));
   return {
     repository: {
@@ -1160,15 +1181,20 @@ function makeUF(n){
   return { find, union: (a, b) => { p[find(a)] = find(b); } };
 }
 // Pool people across creators + contributors (distinct by exact name, enriched with identifiers/sources).
+// The DOI and first title of a record — used to note which records a distinct entity appears in.
+function recDoi(r){ return (r && r.id) || (r && r.attributes && r.attributes.doi) || null; }
+function recTitle(r){ const t = r && r.attributes && Array.isArray(r.attributes.titles) && r.attributes.titles[0]; return (t && t.title) || '(untitled)'; }
+function noteDoc(e, r){ const doi = recDoi(r); if (doi && !e.docs.has(doi)) e.docs.set(doi, recTitle(r)); }
+
 function collectPeople(records){
   const map = new Map();
-  const add = (name, idvals, source) => {
+  const add = (name, idvals, source, r) => {
     if (!name) return;
     let e = map.get(name);
-    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set() }; map.set(name, e); }
+    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set(), docs:new Map() }; map.set(name, e); }
     e.occ++; if (idvals.length) e.id++;
     for (const v of idvals) e.ids.set(idKey(v), idDisplay(v));
-    e.sources.add(source);
+    e.sources.add(source); noteDoc(e, r);
   };
   for (const r of records){
     for (const [source, key] of [['Creator','creators'], ['Contributor','contributors']]){
@@ -1179,7 +1205,7 @@ function collectPeople(records){
         if (!name) continue;
         const idvals = (Array.isArray(p.nameIdentifiers) ? p.nameIdentifiers : [])
           .map(n => n && n.nameIdentifier).filter(Boolean);
-        add(name, idvals, source);
+        add(name, idvals, source, r);
       }
     }
   }
@@ -1187,12 +1213,12 @@ function collectPeople(records){
 }
 function collectAffiliations(records){
   const map = new Map();
-  const add = (name, idval, source) => {
+  const add = (name, idval, source, r) => {
     if (!name) return;
     let e = map.get(name);
-    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set() }; map.set(name, e); }
+    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set(), docs:new Map() }; map.set(name, e); }
     e.occ++; if (idval){ e.id++; e.ids.set(idKey(idval), idDisplay(idval)); }
-    e.sources.add(source);
+    e.sources.add(source); noteDoc(e, r);
   };
   for (const r of records){
     for (const [source, key] of [['Creator','creators'], ['Contributor','contributors']]){
@@ -1200,7 +1226,7 @@ function collectAffiliations(records){
       for (const p of arr){
         if (!p || typeof p !== 'object') continue;
         for (const a of (Array.isArray(p.affiliation) ? p.affiliation : [])){
-          if (a && a.name) add(a.name, a.affiliationIdentifier, source);
+          if (a && a.name) add(a.name, a.affiliationIdentifier, source, r);
         }
       }
     }
@@ -1221,18 +1247,19 @@ function collectRights(records){
   const ridKey = v => String(v).toLowerCase().replace(/^https?:\/\//, '').replace(/[^a-z0-9]/g, '');
   const ridDisplay = v => String(v).replace(/\/+$/, '').trim();
   const map = new Map();
-  const add = (name, idvals) => {
+  const add = (name, idvals, r) => {
     if (!name || !isLicenseLike(name)) return;
     let e = map.get(name);
-    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set() }; map.set(name, e); }
+    if (!e){ e = { name, occ:0, id:0, ids:new Map(), sources:new Set(), docs:new Map() }; map.set(name, e); }
     e.occ++; if (idvals.length) e.id++;
     for (const v of idvals) e.ids.set(ridKey(v), ridDisplay(v));
+    noteDoc(e, r);
   };
   for (const r of records){
     for (const x of ((r.attributes && Array.isArray(r.attributes.rightsList)) ? r.attributes.rightsList : [])){
       if (!x || typeof x !== 'object') continue;
       const name = x.rights || x.rightsUri || x.rightsIdentifier; if (!name) continue;
-      add(name, [x.rightsUri, x.rightsIdentifier].filter(Boolean));
+      add(name, [x.rightsUri, x.rightsIdentifier].filter(Boolean), r);
     }
   }
   return [...map.values()];
@@ -1302,7 +1329,8 @@ function clusterEntities(entities, sim){
       conflict,
       totalOcc, totalId,
       propagatable: totalId > 0 ? totalOcc - totalId : 0,
-      variants: members.map(m => ({ name: m.name, occ: m.occ, id: m.id, sources: [...m.sources], identifier: [...m.ids.values()].join('; ') }))
+      variants: members.map(m => ({ name: m.name, occ: m.occ, id: m.id, sources: [...m.sources], identifier: [...m.ids.values()].join('; '),
+                                    docs: [...m.docs].map(([doi, title]) => ({ doi, title })) }))
     });
   }
   clusters.sort((a, b) => b.propagatable - a.propagatable || b.totalOcc - a.totalOcc || b.variants.length - a.variants.length);
@@ -1334,9 +1362,25 @@ function dupBadges(cl){
   const prop = cl.propagatable > 0 ? `<span class="dup-badge prop">${cl.propagatable.toLocaleString()} can propagate</span>` : '';
   return conf + prop;
 }
-function dupClusterMarkup(cl, entLabel){
-  const rows = cl.variants.map(v =>
-    `<tr><td class="val">${escHtml(v.name)}</td><td class="num">${v.occ.toLocaleString()}</td><td class="num">${v.id.toLocaleString()}</td><td class="val">${escHtml(v.sources.join(', '))}</td><td class="val">${escHtml(v.identifier)}</td></tr>`).join('');
+// Render an identifier value as a link to its home page when recognizable (ORCID, ROR, a URL, or an SPDX id).
+function idLinkOne(v){
+  v = String(v).trim(); if (!v) return '';
+  const esc = escHtml(v), a = url => `<a href="${escAttr(url)}" target="_blank" rel="noopener">${esc}</a>`;
+  if (/^https?:\/\//i.test(v)) return a(v);
+  if (/^\d{4}-\d{4}-\d{4}-\d{3}[\dxX]$/.test(v)) return a('https://orcid.org/' + v);
+  if (/^0[a-hj-km-np-tv-z0-9]{6}\d{2}$/.test(v)) return a('https://ror.org/' + v);
+  if (v.length <= 40 && /^[a-z0-9][a-z0-9.+-]*$/i.test(v)) return a('https://spdx.org/licenses/' + v + '.html');  // SPDX-ish rights id
+  return esc;
+}
+function idHtml(joined){
+  const parts = String(joined || '').split(';').map(s => s.trim()).filter(Boolean).map(idLinkOne);
+  return parts.length ? parts.join('; ') : '—';
+}
+function dupClusterMarkup(cl, entLabel, pool, ci){
+  const rows = cl.variants.map((v, vi) =>
+    `<tr><td class="val">${escHtml(v.name)}</td>` +
+    `<td class="num">${v.docs && v.docs.length ? `<a class="dup-doc-link" data-pool="${pool}" data-ci="${ci}" data-vi="${vi}" title="List the DOIs where this spelling occurs">${v.occ.toLocaleString()}</a>` : v.occ.toLocaleString()}</td>` +
+    `<td class="num">${v.id.toLocaleString()}</td><td class="val">${escHtml(v.sources.join(', '))}</td><td class="val">${idHtml(v.identifier)}</td></tr>`).join('');
   return `<details class="dup-cl"><summary><span class="dup-canon">${escHtml(cl.canonical)}</span> <span class="dup-count">${cl.variants.length} spellings · ${cl.totalOcc.toLocaleString()} occ</span> ${dupBadges(cl)}</summary>
     <table class="cd-table"><thead><tr><th>${escHtml(entLabel)}</th><th class="num">Occ</th><th class="num">Identified</th><th>Source</th><th>Identifier</th></tr></thead><tbody>${rows}</tbody></table></details>`;
 }
@@ -1344,17 +1388,57 @@ function renderDuplicates(){
   if (!lastRun) return;
   const dup = findDuplicates(lastRun.records, dupThreshold());
   lastRun.duplicates = dup; dupState = dup;
-  const section = (title, clusters, entLabel) => {
+  const section = (title, clusters, entLabel, poolKey) => {
     const hi = clusters.filter(c => c.confidence === 'high').length;
     const cf = clusters.filter(c => c.confidence === 'conflict').length;
     const tags = [hi ? `${hi} identifier-confirmed` : '', cf ? `${cf} ⚠ shared-id conflict${cf === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
     const head = `<div class="conn-group">${escHtml(title)} — ${clusters.length} potential ${clusters.length === 1 ? 'cluster' : 'clusters'}${tags ? ` · ${tags}` : ''}</div>`;
-    return head + (clusters.length ? clusters.map(c => dupClusterMarkup(c, entLabel)).join('') : '<div class="conn-empty">— none found at this match level —</div>');
+    return head + (clusters.length ? clusters.map((c, ci) => dupClusterMarkup(c, entLabel, poolKey, ci)).join('') : '<div class="conn-empty">— none found at this match level —</div>');
   };
-  $('dup-body').innerHTML = section('People (creators + contributors)', dup.people, 'Person')
-                          + section('Affiliations', dup.affiliations, 'Affiliation')
-                          + section('Rights statements', dup.rights, 'Rights statement');
+  $('dup-body').innerHTML = section('People (creators + contributors)', dup.people, 'Person', 'people')
+                          + section('Affiliations', dup.affiliations, 'Affiliation', 'affiliations')
+                          + section('Rights statements', dup.rights, 'Rights statement', 'rights');
+  $('dup-body').querySelectorAll('.dup-doc-link').forEach(el =>
+    el.addEventListener('click', () => openDupDocs(el.dataset.pool, +el.dataset.ci, +el.dataset.vi)));
   $('dup-card').style.display = '';
+}
+
+/* Drill-down: the DOIs (with titles) where a variant spelling occurs, linked to DataCite Commons. */
+let dupDocsState = null;
+const DUP_DOC_CAP = 20;   // cap the DOI list for a cluster's most-common spelling (the consistent one)
+function openDupDocs(pool, ci, vi){
+  const dup = lastRun && lastRun.duplicates;
+  const v = dup && dup[pool] && dup[pool][ci] && dup[pool][ci].variants[vi];
+  if (!v) return;
+  const allDocs = (v.docs || []).slice().sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  // variants are sorted by occurrence descending, so index 0 is the dominant (consistent) spelling — cap its
+  // list. The point is drilling into the *less* common spellings (the inconsistencies), which stay uncapped.
+  const capped = vi === 0 && allDocs.length > DUP_DOC_CAP;
+  const shown = capped ? allDocs.slice(0, DUP_DOC_CAP) : allDocs;
+  dupDocsState = { name: v.name, docs: allDocs };   // Copy always exports the full list
+  const poolLabel = { people:'people', affiliations:'affiliations', rights:'rights statements' }[pool] || pool;
+  const rowHtml = d => `<tr><td class="val"><a href="https://doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener">${escHtml(d.title)}</a></td>`
+      + `<td class="val"><a href="https://commons.datacite.org/doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener" title="Open in DataCite Commons">${escHtml(d.doi)}</a></td></tr>`;
+  $('dd-title').textContent = v.name;
+  $('dd-sub').textContent = `${allDocs.length.toLocaleString()} DOI${allDocs.length === 1 ? '' : 's'} · ${poolLabel}`
+    + (capped ? ` · showing the first ${DUP_DOC_CAP} (most common spelling) — ⧉ Copy for all` : '')
+    + ' · click a DOI to open its DataCite Commons page';
+  $('dd-body').innerHTML = allDocs.length
+    ? '<table class="cd-table"><thead><tr><th>Title</th><th>DOI</th></tr></thead><tbody>'
+      + shown.map(rowHtml).join('')
+      + (capped ? `<tr><td colspan="2" style="color:#6b7280;font-style:italic;padding-top:.5rem">…and ${(allDocs.length - DUP_DOC_CAP).toLocaleString()} more — use ⧉ Copy to get the full list</td></tr>` : '')
+      + '</tbody></table>'
+    : '<div style="padding:1rem;color:#6b7280;font-size:.8rem">No DOIs recorded for this spelling.</div>';
+  $('dd-modal').style.display = 'flex';
+}
+function closeDupDocs(){ $('dd-modal').style.display = 'none'; dupDocsState = null; }
+async function dupDocsCopy(){
+  if (!dupDocsState) return;
+  const tsv = ['DOI\tTitle', ...dupDocsState.docs.map(d => `${d.doi}\t${String(d.title).replace(/[\t\n\r]/g, ' ')}`)].join('\n');
+  const btn = $('dd-copy');
+  try { await navigator.clipboard.writeText(tsv); btn.textContent = '✓ Copied'; }
+  catch { btn.textContent = 'Copy failed'; }
+  setTimeout(() => { btn.textContent = '⧉ Copy'; }, 1600);
 }
 function duplicateRows(){
   const dup = dupState || findDuplicates(lastRun.records, dupThreshold());
@@ -1527,6 +1611,10 @@ $('cd-copy').addEventListener('click', connDetailCopy);
 $('cd-download').addEventListener('click', connDetailDownloadCsv);
 $('cd-modal').addEventListener('click', e => { if (e.target.id === 'cd-modal') closeConnDetail(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('cd-modal').style.display !== 'none') closeConnDetail(); });
+$('dd-close').addEventListener('click', closeDupDocs);
+$('dd-copy').addEventListener('click', dupDocsCopy);
+$('dd-modal').addEventListener('click', e => { if (e.target.id === 'dd-modal') closeDupDocs(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('dd-modal').style.display !== 'none') closeDupDocs(); });
 if (location.protocol === 'file:') {
   setStatus('This page is open as a local file (file://). DataCite requests will be blocked — serve it over http (e.g. "python3 -m http.server" → http://localhost:8000/metadataConnectivity.html).', true);
 }

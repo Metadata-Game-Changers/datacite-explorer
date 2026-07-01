@@ -1405,19 +1405,28 @@ function renderDuplicates(){
 
 /* Drill-down: the DOIs (with titles) where a variant spelling occurs, linked to DataCite Commons. */
 let dupDocsState = null;
+const DUP_DOC_CAP = 20;   // cap the DOI list for a cluster's most-common spelling (the consistent one)
 function openDupDocs(pool, ci, vi){
   const dup = lastRun && lastRun.duplicates;
   const v = dup && dup[pool] && dup[pool][ci] && dup[pool][ci].variants[vi];
   if (!v) return;
-  const docs = (v.docs || []).slice().sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  dupDocsState = { name: v.name, docs };
+  const allDocs = (v.docs || []).slice().sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  // variants are sorted by occurrence descending, so index 0 is the dominant (consistent) spelling — cap its
+  // list. The point is drilling into the *less* common spellings (the inconsistencies), which stay uncapped.
+  const capped = vi === 0 && allDocs.length > DUP_DOC_CAP;
+  const shown = capped ? allDocs.slice(0, DUP_DOC_CAP) : allDocs;
+  dupDocsState = { name: v.name, docs: allDocs };   // Copy always exports the full list
   const poolLabel = { people:'people', affiliations:'affiliations', rights:'rights statements' }[pool] || pool;
+  const rowHtml = d => `<tr><td class="val"><a href="https://doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener">${escHtml(d.title)}</a></td>`
+      + `<td class="val"><a href="https://commons.datacite.org/doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener" title="Open in DataCite Commons">${escHtml(d.doi)}</a></td></tr>`;
   $('dd-title').textContent = v.name;
-  $('dd-sub').textContent = `${docs.length.toLocaleString()} DOI${docs.length === 1 ? '' : 's'} · ${poolLabel} · click a DOI to open its DataCite Commons page`;
-  $('dd-body').innerHTML = docs.length
+  $('dd-sub').textContent = `${allDocs.length.toLocaleString()} DOI${allDocs.length === 1 ? '' : 's'} · ${poolLabel}`
+    + (capped ? ` · showing the first ${DUP_DOC_CAP} (most common spelling) — ⧉ Copy for all` : '')
+    + ' · click a DOI to open its DataCite Commons page';
+  $('dd-body').innerHTML = allDocs.length
     ? '<table class="cd-table"><thead><tr><th>Title</th><th>DOI</th></tr></thead><tbody>'
-      + docs.map(d => `<tr><td class="val"><a href="https://doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener">${escHtml(d.title)}</a></td>`
-        + `<td class="val"><a href="https://commons.datacite.org/doi.org/${escAttr(d.doi)}" target="_blank" rel="noopener" title="Open in DataCite Commons">${escHtml(d.doi)}</a></td></tr>`).join('')
+      + shown.map(rowHtml).join('')
+      + (capped ? `<tr><td colspan="2" style="color:#6b7280;font-style:italic;padding-top:.5rem">…and ${(allDocs.length - DUP_DOC_CAP).toLocaleString()} more — use ⧉ Copy to get the full list</td></tr>` : '')
       + '</tbody></table>'
     : '<div style="padding:1rem;color:#6b7280;font-size:.8rem">No DOIs recorded for this spelling.</div>';
   $('dd-modal').style.display = 'flex';
